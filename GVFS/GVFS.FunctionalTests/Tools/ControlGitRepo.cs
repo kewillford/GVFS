@@ -1,6 +1,7 @@
 ﻿using GVFS.FunctionalTests.FileSystemRunners;
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace GVFS.FunctionalTests.Tools
 {
@@ -49,6 +50,7 @@ namespace GVFS.FunctionalTests.Tools
             GitProcess.Invoke(this.RootPath, "init");
             GitProcess.Invoke(this.RootPath, "config core.autocrlf false");
             GitProcess.Invoke(this.RootPath, "config merge.stat false");
+            GitProcess.Invoke(this.RootPath, "config merge.renames false");
             GitProcess.Invoke(this.RootPath, "config advice.statusUoption false");
             GitProcess.Invoke(this.RootPath, "config core.abbrev 40");
             GitProcess.Invoke(this.RootPath, "config status.aheadbehind false");
@@ -68,7 +70,15 @@ namespace GVFS.FunctionalTests.Tools
 
         public void Delete()
         {
-            CmdRunner.DeleteDirectoryWithRetry(this.RootPath);
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                CmdRunner.DeleteDirectoryWithUnlimitedRetries(this.RootPath);
+            }
+            else
+            {
+                // TODO(Mac): See if we can use BashRunner.DeleteDirectoryWithRetry on Windows as well
+                BashRunner.DeleteDirectoryWithUnlimitedRetries(this.RootPath);
+            }
         }
     }
 }

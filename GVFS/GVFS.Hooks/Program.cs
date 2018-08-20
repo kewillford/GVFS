@@ -1,13 +1,11 @@
 ﻿using GVFS.Common;
 using GVFS.Common.Git;
 using GVFS.Common.NamedPipes;
-using GVFS.Platform.Windows;
+using GVFS.Hooks.HooksPlatform;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Security.Principal;
 
 namespace GVFS.Hooks
 {
@@ -40,19 +38,19 @@ namespace GVFS.Hooks
 
                 string errorMessage;
                 string normalizedCurrentDirectory;
-                if (!WindowsFileSystem.TryGetNormalizedPathImplementation(Environment.CurrentDirectory, out normalizedCurrentDirectory, out errorMessage))
+                if (!GVFSHooksPlatform.TryGetNormalizedPath(Environment.CurrentDirectory, out normalizedCurrentDirectory, out errorMessage))
                 {
                     ExitWithError($"Failed to determine final path for current directory {Environment.CurrentDirectory}. Error: {errorMessage}");
                 }
 
-                if (!WindowsPlatform.TryGetGVFSEnlistmentRootImplementation(Environment.CurrentDirectory, out enlistmentRoot, out errorMessage))
+                if (!GVFSHooksPlatform.TryGetGVFSEnlistmentRoot(Environment.CurrentDirectory, out enlistmentRoot, out errorMessage))
                 {
                     // Nothing to hook when being run outside of a GVFS repo.
                     // This is also the path when run with --git-dir outside of a GVFS directory, see Story #949665
                     Environment.Exit(0);
                 }
 
-                enlistmentPipename = Paths.GetNamedPipeName(enlistmentRoot);
+                enlistmentPipename = GVFSHooksPlatform.GetNamedPipeName(enlistmentRoot);
 
                 switch (GetHookType(args))
                 {
@@ -161,33 +159,26 @@ namespace GVFS.Hooks
             if (File.Exists(Path.Combine(srcRoot, GVFSConstants.DotGit.MergeHead)) ||
                 File.Exists(Path.Combine(srcRoot, GVFSConstants.DotGit.RevertHead)))
             {
-                // If no-renames and no-breaks are specified, avoid reading config.
-                if (!args.Contains("--no-renames") || !args.Contains("--no-breaks"))
+                // If no-renames is specified, avoid reading config.
+                if (!args.Contains("--no-renames"))
                 {
+                    // To behave properly, this needs to check for the status.renames setting the same
+                    // way that git does including global and local config files, setting inheritance from
+                    // diff.renames, etc.  This is probably best accomplished by calling "git config --get status.renames"
+                    // to ensure we are getting the correct value and then checking for "true" (rather than
+                    // just existance like below).
                     Dictionary<string, GitConfigSetting> statusConfig = GitConfigHelper.GetSettings(
                         File.ReadAllLines(Path.Combine(srcRoot, GVFSConstants.DotGit.Config)),
-                        "status");
+                        "test");
 
-                    if (!IsRunningWithParamOrSetting(args, statusConfig, "--no-renames", "renames") ||
-                        !IsRunningWithParamOrSetting(args, statusConfig, "--no-breaks", "breaks"))
+                    if (!statusConfig.ContainsKey("renames"))
                     {
                         ExitWithError(
                             "git status requires rename detection to be disabled during a merge or revert conflict.",
-                            "Run 'git status --no-renames --no-breaks'");
+                            "Run 'git status --no-renames'");
                     }
                 }
             }
-        }
-
-        private static bool IsRunningWithParamOrSetting(
-            string[] args, 
-            Dictionary<string, GitConfigSetting> configSettings, 
-            string expectedArg, 
-            string expectedSetting)
-        {
-            return 
-                args.Contains(expectedArg) ||
-                configSettings.ContainsKey(expectedSetting);
         }
 
         private static void RunLockRequest(string[] args, bool unattended, LockRequestDelegate requestToRun)
@@ -205,7 +196,7 @@ namespace GVFS.Hooks
 
                         int pid = GetParentPid(args);
                         if (pid == Program.InvalidProcessId ||
-                            !ProcessHelper.IsProcessActive(pid))
+                            !GVFSHooksPlatform.IsProcessActive(pid))
                         {
                             ExitWithError("GVFS.Hooks: Unable to find parent git.exe process " + "(PID: " + pid + ").");
                         }
@@ -251,7 +242,7 @@ namespace GVFS.Hooks
         private static void AcquireGVFSLockForProcess(bool unattended, string[] args, int pid, NamedPipeClient pipeClient)
         {
             string result;
-            bool checkGvfsLockAvailabilitOnly = CheckGVFSLockAvailabilityOnly(args);
+            bool checkGvfsLockAvailabilityOnly = CheckGVFSLockAvailabilityOnly(args);
             string fullCommand = GenerateFullCommand(args);
 
             if (!GVFSLock.TryAcquireGVFSLockForProcess(
@@ -259,10 +250,11 @@ namespace GVFS.Hooks
                     pipeClient,
                     fullCommand,
                     pid,
-                    WindowsPlatform.IsElevatedImplementation(),
-                    checkGvfsLockAvailabilitOnly,
-                    null, // gvfsEnlistmentRoot
-                    out result))
+                    GVFSHooksPlatform.IsElevated(),
+                    isConsoleOutputRedirectedToFile: GVFSHooksPlatform.IsConsoleOutputRedirectedToFile(),
+                    checkAvailabilityOnly: checkGvfsLockAvailabilityOnly,
+                    gvfsEnlistmentRoot: null,
+                    result: out result))
             {
                 ExitWithError(result);
             }
@@ -277,7 +269,8 @@ namespace GVFS.Hooks
                 pipeClient,
                 fullCommand,
                 pid,
-                WindowsPlatform.IsElevatedImplementation(),
+                GVFSHooksPlatform.IsElevated(),
+                GVFSHooksPlatform.IsConsoleOutputRedirectedToFile(),
                 response =>
                 {
                     if (response == null || response.ResponseData == null)
