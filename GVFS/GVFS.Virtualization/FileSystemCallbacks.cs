@@ -425,6 +425,7 @@ namespace GVFS.Virtualization
 
         public virtual void OnFileRenamed(string oldRelativePath, string newRelativePath)
         {
+            this.newlyCreatedFileAndFolderPaths.Add(newRelativePath);
             this.backgroundFileSystemTaskRunner.Enqueue(FileSystemTask.OnFileRenamed(oldRelativePath, newRelativePath));
         }
 
@@ -626,7 +627,14 @@ namespace GVFS.Virtualization
                     result = FileSystemTaskResult.Success;
                     if (!string.IsNullOrEmpty(gitUpdate.OldVirtualPath) && !IsPathInsideDotGit(gitUpdate.OldVirtualPath))
                     {
-                        result = this.AddModifiedPathAndRemoveFromPlaceholderList(gitUpdate.OldVirtualPath);
+                        if (this.newlyCreatedFileAndFolderPaths.Contains(gitUpdate.OldVirtualPath))
+                        {
+                            result = this.TryRemoveModifiedPath(gitUpdate.OldVirtualPath, isFolder: false);
+                        }
+                        else
+                        {
+                            result = this.AddModifiedPathAndRemoveFromPlaceholderList(gitUpdate.OldVirtualPath);
+                        }
                     }
 
                     if (result == FileSystemTaskResult.Success &&
@@ -839,7 +847,7 @@ namespace GVFS.Virtualization
 
         private FileSystemTaskResult PostBackgroundOperation()
         {
-            this.modifiedPaths.ForceFlush();
+            this.modifiedPaths.WriteAllEntriesAndFlush();
             this.gitStatusCache.RefreshAsynchronously();
             return this.GitIndexProjection.CloseIndex();
         }
