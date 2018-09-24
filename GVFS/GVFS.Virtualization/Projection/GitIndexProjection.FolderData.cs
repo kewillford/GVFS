@@ -29,14 +29,14 @@ namespace GVFS.Virtualization.Projection
                 this.ChildEntries.Clear();
             }
 
-            public FolderData AddChildFolder(LazyUTF8String name)
+            public void AddChildFolder(LazyUTF8String name)
             {
-                return this.ChildEntries.AddFolder(name);
+                this.ChildEntries.AddFolder(name);
             }
 
-            public FileData AddChildFile(LazyUTF8String name, byte[] shaBytes)
+            public void AddChildFile(LazyUTF8String name, byte[] shaBytes)
             {
-                return this.ChildEntries.AddFile(name, shaBytes);
+                this.ChildEntries.AddFile(name, shaBytes);
             }
 
             public void PopulateSizes(

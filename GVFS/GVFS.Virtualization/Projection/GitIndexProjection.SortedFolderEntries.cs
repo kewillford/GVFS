@@ -88,16 +88,22 @@ namespace GVFS.Virtualization.Projection
                 this.sortedEntries.Clear();
             }
 
-            public FolderData AddFolder(LazyUTF8String name)
+            public void AddFolder(LazyUTF8String name)
             {
                 int insertionIndex = this.GetInsertionIndex(name);
-                return this.InsertFolder(name, insertionIndex);
+                if (insertionIndex >= 0)
+                {
+                    this.InsertFolder(name, insertionIndex);
+                }
             }
 
-            public FileData AddFile(LazyUTF8String name, byte[] shaBytes)
+            public void AddFile(LazyUTF8String name, byte[] shaBytes)
             {
                 int insertionIndex = this.GetInsertionIndex(name);
-                return this.InsertFile(name, shaBytes, insertionIndex);
+                if (insertionIndex >= 0)
+                {
+                    this.InsertFile(name, shaBytes, insertionIndex);
+                }
             }
 
             public FolderData GetOrAddFolder(LazyUTF8String name)
@@ -132,7 +138,10 @@ namespace GVFS.Virtualization.Projection
                     insertionIndex = this.GetSortedEntriesIndexOfName(name);
                     if (insertionIndex >= 0)
                     {
-                        throw new InvalidOperationException("All entries should be unique");
+                        // Two paths can get in the index when merging and the case on a
+                        // file or folder was changed since we are turning off rename detection
+                        // return a -1 to skip the additional entry
+                        return -1;
                     }
 
                     // When the name is not found the returned value is the bitwise complement of
