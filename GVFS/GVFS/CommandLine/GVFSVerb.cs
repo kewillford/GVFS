@@ -14,7 +14,7 @@ using System.Security;
 
 namespace GVFS.CommandLine
 {
-    public abstract class GVFSVerb
+    public abstract class GVFSVerb : ConsoleSpinner.IOutputWriter
     {
         protected const string StartServiceInstructions = "Run 'sc start GVFS.Service' from an elevated command prompt to ensure it is running.";
 
@@ -168,6 +168,22 @@ namespace GVFS.CommandLine
 
         public virtual void InitializeDefaultParameterValues()
         {
+        }
+
+        public virtual void Write(string value, int removeLength)
+        {
+            if (removeLength > 0)
+            {
+                int left = Console.CursorLeft - removeLength;
+                if (left < 0)
+                {
+                    left = 0;
+                }
+
+                Console.SetCursorPosition(left, Console.CursorTop);
+            }
+
+            Console.Write(value);
         }
 
         protected ReturnCode Execute<TVerb>(

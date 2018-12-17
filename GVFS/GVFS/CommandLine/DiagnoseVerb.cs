@@ -30,6 +30,8 @@ namespace GVFS.CommandLine
 
         protected override void Execute(GVFSEnlistment enlistment)
         {
+            ConsoleSpinner spinner = new ConsoleSpinner(this, "Testing");
+
             string diagnosticsRoot = Path.Combine(enlistment.DotGVFSRoot, "diagnostics");
 
             if (!Directory.Exists(diagnosticsRoot))
@@ -75,98 +77,90 @@ namespace GVFS.CommandLine
 
                 this.RecordVersionInformation();
 
-                this.ShowStatusWhileRunning(
-                    () =>
-                        this.RunAndRecordGVFSVerb<StatusVerb>(archiveFolderPath, "gvfs_status.txt") != ReturnCode.Success ||
-                        this.RunAndRecordGVFSVerb<UnmountVerb>(archiveFolderPath, "gvfs_unmount.txt", verb => verb.SkipLock = true) == ReturnCode.Success,
-                    "Unmounting",
-                    suppressGvfsLogMessage: true);
+                spinner.WriteMessage("Unmounting");
+                spinner.WriteResult(this.RunAndRecordGVFSVerb<StatusVerb>(archiveFolderPath, "gvfs_status.txt") != ReturnCode.Success ||
+                    this.RunAndRecordGVFSVerb<UnmountVerb>(archiveFolderPath, "gvfs_unmount.txt", verb => verb.SkipLock = true) == ReturnCode.Success);
 
-                this.ShowStatusWhileRunning(
-                    () =>
-                    {
-                        // .gvfs
-                        this.CopyAllFiles(enlistment.EnlistmentRoot, archiveFolderPath, GVFSConstants.DotGVFS.Root, copySubFolders: false);
+                spinner.WriteMessage("Copying logs");
 
-                        if (GVFSPlatform.Instance.UnderConstruction.SupportsKernelLogs)
-                        {
-                            // driver
-                            this.FlushKernelDriverLogs();
-                            string kernelLogsFolderPath = GVFSPlatform.Instance.KernelDriver.LogsFolderPath;
+                // .gvfs
+                this.CopyAllFiles(enlistment.EnlistmentRoot, archiveFolderPath, GVFSConstants.DotGVFS.Root, copySubFolders: false);
 
-                            // This copy sometimes fails because the OS has an exclusive lock on the etl files. The error is not actionable
-                            // for the user so we don't write the error message to stdout, just to our own log file.
-                            this.CopyAllFiles(Path.GetDirectoryName(kernelLogsFolderPath), archiveFolderPath, Path.GetFileName(kernelLogsFolderPath), copySubFolders: false, hideErrorsFromStdout: true);
-                        }
+                if (GVFSPlatform.Instance.UnderConstruction.SupportsKernelLogs)
+                {
+                    // driver
+                    this.FlushKernelDriverLogs();
+                    string kernelLogsFolderPath = GVFSPlatform.Instance.KernelDriver.LogsFolderPath;
 
-                        // .git
-                        this.CopyAllFiles(enlistment.WorkingDirectoryRoot, archiveFolderPath, GVFSConstants.DotGit.Root, copySubFolders: false);
-                        this.CopyAllFiles(enlistment.WorkingDirectoryRoot, archiveFolderPath, GVFSConstants.DotGit.Hooks.Root, copySubFolders: false);
-                        this.CopyAllFiles(enlistment.WorkingDirectoryRoot, archiveFolderPath, GVFSConstants.DotGit.Info.Root, copySubFolders: false);
-                        this.CopyAllFiles(enlistment.WorkingDirectoryRoot, archiveFolderPath, GVFSConstants.DotGit.Logs.Root, copySubFolders: true);
-                        this.CopyAllFiles(enlistment.WorkingDirectoryRoot, archiveFolderPath, GVFSConstants.DotGit.Refs.Root, copySubFolders: true);
-                        this.CopyAllFiles(enlistment.WorkingDirectoryRoot, archiveFolderPath, GVFSConstants.DotGit.Objects.Info.Root, copySubFolders: false);
-                        this.LogDirectoryEnumeration(enlistment.WorkingDirectoryRoot, Path.Combine(archiveFolderPath, GVFSConstants.DotGit.Objects.Root), GVFSConstants.DotGit.Objects.Pack.Root, "packs-local.txt");
-                        this.LogLooseObjectCount(enlistment.WorkingDirectoryRoot, Path.Combine(archiveFolderPath, GVFSConstants.DotGit.Objects.Root), GVFSConstants.DotGit.Objects.Root, "objects-local.txt");
+                    // This copy sometimes fails because the OS has an exclusive lock on the etl files. The error is not actionable
+                    // for the user so we don't write the error message to stdout, just to our own log file.
+                    this.CopyAllFiles(Path.GetDirectoryName(kernelLogsFolderPath), archiveFolderPath, Path.GetFileName(kernelLogsFolderPath), copySubFolders: false, hideErrorsFromStdout: true);
+                }
 
-                        // databases
-                        this.CopyAllFiles(enlistment.DotGVFSRoot, Path.Combine(archiveFolderPath, GVFSConstants.DotGVFS.Root), GVFSConstants.DotGVFS.Databases.Name, copySubFolders: false);
+                // .git
+                this.CopyAllFiles(enlistment.WorkingDirectoryRoot, archiveFolderPath, GVFSConstants.DotGit.Root, copySubFolders: false);
+                this.CopyAllFiles(enlistment.WorkingDirectoryRoot, archiveFolderPath, GVFSConstants.DotGit.Hooks.Root, copySubFolders: false);
+                this.CopyAllFiles(enlistment.WorkingDirectoryRoot, archiveFolderPath, GVFSConstants.DotGit.Info.Root, copySubFolders: false);
+                this.CopyAllFiles(enlistment.WorkingDirectoryRoot, archiveFolderPath, GVFSConstants.DotGit.Logs.Root, copySubFolders: true);
+                this.CopyAllFiles(enlistment.WorkingDirectoryRoot, archiveFolderPath, GVFSConstants.DotGit.Refs.Root, copySubFolders: true);
+                this.CopyAllFiles(enlistment.WorkingDirectoryRoot, archiveFolderPath, GVFSConstants.DotGit.Objects.Info.Root, copySubFolders: false);
+                this.LogDirectoryEnumeration(enlistment.WorkingDirectoryRoot, Path.Combine(archiveFolderPath, GVFSConstants.DotGit.Objects.Root), GVFSConstants.DotGit.Objects.Pack.Root, "packs-local.txt");
+                this.LogLooseObjectCount(enlistment.WorkingDirectoryRoot, Path.Combine(archiveFolderPath, GVFSConstants.DotGit.Objects.Root), GVFSConstants.DotGit.Objects.Root, "objects-local.txt");
 
-                        // local cache
-                        this.CopyLocalCacheData(archiveFolderPath, localCacheRoot, gitObjectsRoot);
+                // databases
+                this.CopyAllFiles(enlistment.DotGVFSRoot, Path.Combine(archiveFolderPath, GVFSConstants.DotGVFS.Root), GVFSConstants.DotGVFS.Databases.Name, copySubFolders: false);
 
-                        // corrupt objects
-                        this.CopyAllFiles(enlistment.DotGVFSRoot, Path.Combine(archiveFolderPath, GVFSConstants.DotGVFS.Root), GVFSConstants.DotGVFS.CorruptObjectsName, copySubFolders: false);
+                // local cache
+                this.CopyLocalCacheData(archiveFolderPath, localCacheRoot, gitObjectsRoot);
 
-                        if (GVFSPlatform.Instance.UnderConstruction.SupportsGVFSService)
-                        {
-                            // service
-                            this.CopyAllFiles(
-                                Paths.GetServiceDataRoot(string.Empty),
-                                archiveFolderPath,
-                                this.ServiceName,
-                                copySubFolders: true);
-                        }
+                // corrupt objects
+                this.CopyAllFiles(enlistment.DotGVFSRoot, Path.Combine(archiveFolderPath, GVFSConstants.DotGVFS.Root), GVFSConstants.DotGVFS.CorruptObjectsName, copySubFolders: false);
 
-                        if (GVFSPlatform.Instance.UnderConstruction.SupportsGVFSUpgrade)
-                        {
-                            // upgrader
-                            this.CopyAllFiles(
-                                ProductUpgrader.GetUpgradesDirectoryPath(),
-                                archiveFolderPath,
-                                ProductUpgrader.LogDirectory,
-                                copySubFolders: true,
-                                targetFolderName: ProductUpgrader.UpgradeDirectoryName);
-                            this.LogDirectoryEnumeration(
-                                ProductUpgrader.GetUpgradesDirectoryPath(),
-                                Path.Combine(archiveFolderPath, ProductUpgrader.UpgradeDirectoryName),
-                                ProductUpgrader.DownloadDirectory,
-                                "downloaded-assets.txt");
-                        }
-                     
-                        return true;
-                    },
-                    "Copying logs");
+                if (GVFSPlatform.Instance.UnderConstruction.SupportsGVFSService)
+                {
+                    // service
+                    this.CopyAllFiles(
+                        Paths.GetServiceDataRoot(string.Empty),
+                        archiveFolderPath,
+                        this.ServiceName,
+                        copySubFolders: true);
+                }
 
-                this.ShowStatusWhileRunning(
-                    () => this.RunAndRecordGVFSVerb<MountVerb>(archiveFolderPath, "gvfs_mount.txt") == ReturnCode.Success,
-                    "Mounting",
-                    suppressGvfsLogMessage: true);
+                if (GVFSPlatform.Instance.UnderConstruction.SupportsGVFSUpgrade)
+                {
+                    // upgrader
+                    this.CopyAllFiles(
+                        ProductUpgrader.GetUpgradesDirectoryPath(),
+                        archiveFolderPath,
+                        ProductUpgrader.LogDirectory,
+                        copySubFolders: true,
+                        targetFolderName: ProductUpgrader.UpgradeDirectoryName);
+                    this.LogDirectoryEnumeration(
+                        ProductUpgrader.GetUpgradesDirectoryPath(),
+                        Path.Combine(archiveFolderPath, ProductUpgrader.UpgradeDirectoryName),
+                        ProductUpgrader.DownloadDirectory,
+                        "downloaded-assets.txt");
+                }
+
+                spinner.WriteResult(ConsoleSpinner.ActionResult.Success);
+                spinner.WriteMessage("Mounting");
+                spinner.WriteResult(this.RunAndRecordGVFSVerb<MountVerb>(archiveFolderPath, "gvfs_mount.txt") == ReturnCode.Success);
+
+            // suppressGvfsLogMessage: true);
 
                 this.CopyAllFiles(enlistment.DotGVFSRoot, Path.Combine(archiveFolderPath, GVFSConstants.DotGVFS.Root), "logs", copySubFolders: false);
             }
 
             string zipFilePath = archiveFolderPath + ".zip";
-            this.ShowStatusWhileRunning(
-                () =>
-                {
-                    ZipFile.CreateFromDirectory(archiveFolderPath, zipFilePath);
-                    PhysicalFileSystem.RecursiveDelete(archiveFolderPath);
+            spinner.WriteMessage("Creating zip file");
 
-                    return true;
-                },
-                "Creating zip file",
-                suppressGvfsLogMessage: true);
+            ZipFile.CreateFromDirectory(archiveFolderPath, zipFilePath);
+            PhysicalFileSystem.RecursiveDelete(archiveFolderPath);
+
+            spinner.WriteResult(ConsoleSpinner.ActionResult.Success);
+
+            // suppressGvfsLogMessage: true);
+            spinner.Dispose();
 
             this.Output.WriteLine();
             this.Output.WriteLine("Diagnostics complete. All of the gathered info, as well as all of the output above, is captured in");
