@@ -252,7 +252,7 @@ namespace GVFS.FunctionalTests.Tests.MultiEnlistmentTests
             // Determine the new local cache key
             string newMappingFileContents = mappingFilePath.ShouldBeAFile(this.fileSystem).WithContents();
             const int GuidStringLength = 32;
-            string mappingFileKey = "A {\"Key\":\"https://gvfs.visualstudio.com/ci/_git/fortests\",\"Value\":\"";
+            string mappingFileKey = "A {\"Key\":\"https://github.com/Microsoft/VFSForGit.git\",\"Value\":\"";
             int localKeyIndex = newMappingFileContents.IndexOf(mappingFileKey);
             string newCacheKey = newMappingFileContents.Substring(localKeyIndex + mappingFileKey.Length, GuidStringLength);
 

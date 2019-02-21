@@ -27,7 +27,7 @@ namespace GVFS.FunctionalTests.Properties
             {
                 CurrentDirectory = Path.GetFullPath(Path.GetDirectoryName(Environment.GetCommandLineArgs()[0]));
 
-                RepoToClone = @"https://gvfs.visualstudio.com/ci/_git/ForTests";
+                RepoToClone = @"https://github.com/Microsoft/VFSForGit.git";
                 Commitish = @"FunctionalTests/20180214";
 
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
