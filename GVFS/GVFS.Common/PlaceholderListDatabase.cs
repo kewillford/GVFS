@@ -6,6 +6,7 @@ using System.IO;
 
 namespace GVFS.Common
 {
+    [Obsolete("Has been replaced by BinaryPlaceholderListDatabase for performance reasons", false)]
     public class PlaceholderListDatabase : FileBasedCollection
     {
         // Special folder values must:
