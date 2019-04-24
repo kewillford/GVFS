@@ -397,7 +397,7 @@ namespace GVFS.Common
             lock (this.fileLock)
             {
                 this.dataFileHandle.Write(bytes, 0, bytes.Length);
-                this.dataFileHandle.Flush();
+                ////this.dataFileHandle.Flush();
             }
         }
 

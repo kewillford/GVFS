@@ -10,6 +10,7 @@ using GVFS.Virtualization.Projection;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -558,6 +559,7 @@ namespace GVFS.Virtualization
 
         private FileSystemTaskResult ExecuteBackgroundOperation(FileSystemTask gitUpdate)
         {
+            Stopwatch stopwatch = Stopwatch.StartNew();
             EventMetadata metadata = new EventMetadata();
 
             FileSystemTaskResult result;
@@ -804,13 +806,20 @@ namespace GVFS.Virtualization
                     throw new InvalidOperationException("Invalid background operation");
             }
 
+            stopwatch.Stop();
+            metadata.Add("Area", "ExecuteBackgroundOperation");
+            metadata.Add("Operation", gitUpdate.Operation.ToString());
+            metadata.Add("Duration", stopwatch.Elapsed.ToString());
+
             if (result != FileSystemTaskResult.Success)
             {
-                metadata.Add("Area", "ExecuteBackgroundOperation");
-                metadata.Add("Operation", gitUpdate.Operation.ToString());
                 metadata.Add(TracingConstants.MessageKey.WarningMessage, "Background operation failed");
                 metadata.Add(nameof(result), result.ToString());
                 this.context.Tracer.RelatedEvent(EventLevel.Warning, "FailedBackgroundOperation", metadata);
+            }
+            else
+            {
+                this.context.Tracer.RelatedInfo(metadata, "Successful Backgroud Operation");
             }
 
             return result;
