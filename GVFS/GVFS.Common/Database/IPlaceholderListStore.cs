@@ -4,7 +4,7 @@ using System.Text;
 
 namespace GVFS.Common.Database
 {
-    class IPlaceholderListStore
+    public interface IPlaceholderListStore
     {
     }
 }

@@ -4,7 +4,10 @@ using System.Text;
 
 namespace GVFS.Common.Database
 {
-    class IModifiedPathsStore
+    public interface IModifiedPathsStore
     {
+        bool TryAdd(string modifiedPath);
+        bool TryRemove(string modifiedPath);
+        bool TryGetAll(out string[] modifiedPaths);
     }
 }
