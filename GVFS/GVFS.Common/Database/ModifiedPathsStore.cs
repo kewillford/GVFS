@@ -49,6 +49,7 @@ namespace GVFS.Common.Database
             {
                 command.Parameters.AddWithValue("@path", modifiedPath);
                 command.CommandText = $"INSERT OR IGNORE INTO ModifiedPaths (path) VALUES (@path);";
+                command.ExecuteNonQuery();
                 return true;
             }
         }
@@ -78,6 +79,7 @@ namespace GVFS.Common.Database
             {
                 command.Parameters.AddWithValue("@path", modifiedPath);
                 command.CommandText = $"DELETE FROM ModifiedPaths WHERE path = @path;";
+                command.ExecuteNonQuery();
                 return true;
             }
         }

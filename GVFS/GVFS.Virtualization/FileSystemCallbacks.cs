@@ -71,17 +71,7 @@ namespace GVFS.Virtualization
 
             this.placeHolderCreationCount = new ConcurrentDictionary<string, PlaceHolderCreateCounter>(StringComparer.OrdinalIgnoreCase);
             this.newlyCreatedFileAndFolderPaths = new ConcurrentHashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            string error;
-            if (!ModifiedPathsDatabase.TryLoadOrCreate(
-                this.context.Tracer,
-                Path.Combine(this.context.Enlistment.DotGVFSRoot, GVFSConstants.DotGVFS.Databases.ModifiedPaths),
-                this.context.FileSystem,
-                out this.modifiedPaths,
-                out error))
-            {
-                throw new InvalidRepoException(error);
-            }
+            this.modifiedPaths = new ModifiedPathsDatabase(this.context.Tracer, this.context.FileSystem, this.context.Enlistment.EnlistmentRoot);
 
             this.BlobSizes = blobSizes;
             this.BlobSizes.Initialize();
@@ -92,7 +82,7 @@ namespace GVFS.Virtualization
                 Path.Combine(this.context.Enlistment.DotGVFSRoot, GVFSConstants.DotGVFS.Databases.PlaceholderList),
                 this.context.FileSystem,
                 out placeholders,
-                out error))
+                out string error))
             {
                 throw new InvalidRepoException(error);
             }
@@ -171,7 +161,6 @@ namespace GVFS.Virtualization
         public bool TryStart(out string error)
         {
             this.modifiedPaths.RemoveEntriesWithParentFolderEntry(this.context.Tracer);
-            this.modifiedPaths.WriteAllEntriesAndFlush();
 
             this.GitIndexProjection.Initialize(this.backgroundFileSystemTaskRunner);
 
@@ -878,7 +867,6 @@ namespace GVFS.Virtualization
 
         private FileSystemTaskResult PostBackgroundOperation()
         {
-            this.modifiedPaths.WriteAllEntriesAndFlush();
             this.gitStatusCache.RefreshAsynchronously();
             return this.GitIndexProjection.CloseIndex();
         }

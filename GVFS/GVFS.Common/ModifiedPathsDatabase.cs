@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using GVFS.Common.Database;
 using GVFS.Common.FileSystem;
 using GVFS.Common.Tracing;
 
@@ -11,45 +12,31 @@ namespace GVFS.Common
     /// git is now responsible for keeping up to date. Files and folders are added
     /// to this list by being created, edited, deleted, or renamed.
     /// </summary>
-    public class ModifiedPathsDatabase : FileBasedCollection
+    public class ModifiedPathsDatabase : IDisposable
     {
         private ConcurrentHashSet<string> modifiedPaths;
+        private ModifiedPathsStore modifiedPathsStore;
 
-        protected ModifiedPathsDatabase(ITracer tracer, PhysicalFileSystem fileSystem, string dataFilePath)
-            : base(tracer, fileSystem, dataFilePath, collectionAppendsDirectlyToFile: true)
+        public ModifiedPathsDatabase(ITracer tracer, PhysicalFileSystem fileSystem, string enlistmentRoot)
         {
             this.modifiedPaths = new ConcurrentHashSet<string>(StringComparer.OrdinalIgnoreCase);
+            this.modifiedPathsStore = new ModifiedPathsStore(tracer, fileSystem, enlistmentRoot);
+            this.modifiedPathsStore.TryGetAll(out string[] paths);
+
+            if (paths.Length == 0)
+            {
+                this.TryAdd(GVFSConstants.SpecialGitFiles.GitAttributes, isFolder: false, isRetryable: out bool isRetryable);
+            }
+
+            foreach (string path in paths)
+            {
+                this.modifiedPaths.Add(path);
+            }
         }
 
         public int Count
         {
             get { return this.modifiedPaths.Count; }
-        }
-
-        public static bool TryLoadOrCreate(ITracer tracer, string dataDirectory, PhysicalFileSystem fileSystem, out ModifiedPathsDatabase output, out string error)
-        {
-            ModifiedPathsDatabase temp = new ModifiedPathsDatabase(tracer, fileSystem, dataDirectory);
-
-            if (!temp.TryLoadFromDisk<string, string>(
-                temp.TryParseAddLine,
-                temp.TryParseRemoveLine,
-                (key, value) => temp.modifiedPaths.Add(key),
-                out error))
-            {
-                temp = null;
-                output = null;
-                return false;
-            }
-
-            if (temp.Count == 0)
-            {
-                bool isRetryable;
-                temp.TryAdd(GVFSConstants.SpecialGitFiles.GitAttributes, isFolder: false, isRetryable: out isRetryable);
-            }
-
-            error = null;
-            output = temp;
-            return true;
         }
 
         /// <summary>
@@ -66,6 +53,7 @@ namespace GVFS.Common
                 {
                     if (this.ContainsParentDirectory(modifiedPath))
                     {
+                        this.modifiedPathsStore.TryRemove(modifiedPath);
                         this.modifiedPaths.TryRemove(modifiedPath);
                     }
                 }
@@ -94,21 +82,8 @@ namespace GVFS.Common
             string entry = this.NormalizeEntryString(path, isFolder);
             if (!this.modifiedPaths.Contains(entry) && !this.ContainsParentDirectory(entry))
             {
-                try
-                {
-                    this.WriteAddEntry(entry, () => this.modifiedPaths.Add(entry));
-                }
-                catch (IOException e)
-                {
-                    this.TraceWarning(isFolder, entry, e, nameof(this.TryAdd));
-                    return false;
-                }
-                catch (Exception e)
-                {
-                    this.TraceError(isFolder, entry, e, nameof(this.TryAdd));
-                    isRetryable = false;
-                    return false;
-                }
+                this.modifiedPathsStore.TryAdd(entry);
+                this.modifiedPaths.Add(entry);
             }
 
             return true;
@@ -121,91 +96,17 @@ namespace GVFS.Common
             if (this.modifiedPaths.Contains(entry))
             {
                 isRetryable = true;
-                try
-                {
-                    this.WriteRemoveEntry(entry, () => this.modifiedPaths.TryRemove(entry));
-                }
-                catch (IOException e)
-                {
-                    this.TraceWarning(isFolder, entry, e, nameof(this.TryRemove));
-                    return false;
-                }
-                catch (Exception e)
-                {
-                    this.TraceError(isFolder, entry, e, nameof(this.TryRemove));
-                    isRetryable = false;
-                    return false;
-                }
+                this.modifiedPathsStore.TryRemove(entry);
+                this.modifiedPaths.TryRemove(entry);
             }
 
             return true;
         }
 
-        public void WriteAllEntriesAndFlush()
+        public void Dispose()
         {
-            try
-            {
-                this.WriteAndReplaceDataFile(this.GenerateDataLines);
-            }
-            catch (Exception e)
-            {
-                throw new FileBasedCollectionException(e);
-            }
-        }
-
-        private static EventMetadata CreateEventMetadata(bool isFolder, string entry, Exception e)
-        {
-            EventMetadata metadata = new EventMetadata();
-            metadata.Add("Area", "ModifiedPathsDatabase");
-            metadata.Add(nameof(entry), entry);
-            metadata.Add(nameof(isFolder), isFolder);
-            if (e != null)
-            {
-                metadata.Add("Exception", e.ToString());
-            }
-
-            return metadata;
-        }
-
-        private IEnumerable<string> GenerateDataLines()
-        {
-            foreach (string entry in this.modifiedPaths)
-            {
-                yield return this.FormatAddLine(entry);
-            }
-        }
-
-        private void TraceWarning(bool isFolder, string entry, Exception e, string method)
-        {
-            if (this.Tracer != null)
-            {
-                EventMetadata metadata = CreateEventMetadata(isFolder, entry, e);
-                this.Tracer.RelatedWarning(metadata, $"{e.GetType().Name} caught while processing {method}");
-            }
-        }
-
-        private void TraceError(bool isFolder, string entry, Exception e, string method)
-        {
-            if (this.Tracer != null)
-            {
-                EventMetadata metadata = CreateEventMetadata(isFolder, entry, e);
-                this.Tracer.RelatedError(metadata, $"{e.GetType().Name} caught while processing {method}");
-            }
-        }
-
-        private bool TryParseAddLine(string line, out string key, out string value, out string error)
-        {
-            key = line;
-            value = null;
-            error = null;
-            return true;
-        }
-
-        private bool TryParseRemoveLine(string line, out string key, out string error)
-        {
-            key = line;
-            error = null;
-            return true;
+            this.modifiedPathsStore?.Dispose();
+            this.modifiedPathsStore = null;
         }
 
         private bool ContainsParentDirectory(string modifiedPath)
