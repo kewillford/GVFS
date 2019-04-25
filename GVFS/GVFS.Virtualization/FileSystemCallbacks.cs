@@ -1,4 +1,5 @@
 ﻿using GVFS.Common;
+using GVFS.Common.Database;
 using GVFS.Common.FileSystem;
 using GVFS.Common.Git;
 using GVFS.Common.NamedPipes;
@@ -31,7 +32,7 @@ namespace GVFS.Virtualization
         private readonly string logsHeadPath;
 
         private GVFSContext context;
-        private ModifiedPathsDatabase modifiedPaths;
+        private GVFSDatabase gvfsDatabase;
         private ConcurrentHashSet<string> newlyCreatedFileAndFolderPaths;
         private ConcurrentDictionary<string, PlaceHolderCreateCounter> placeHolderCreationCount;
         private BackgroundFileSystemTaskRunner backgroundFileSystemTaskRunner;
@@ -71,7 +72,7 @@ namespace GVFS.Virtualization
 
             this.placeHolderCreationCount = new ConcurrentDictionary<string, PlaceHolderCreateCounter>(StringComparer.OrdinalIgnoreCase);
             this.newlyCreatedFileAndFolderPaths = new ConcurrentHashSet<string>(StringComparer.OrdinalIgnoreCase);
-            this.modifiedPaths = new ModifiedPathsDatabase(this.context.Tracer, this.context.FileSystem, this.context.Enlistment.EnlistmentRoot);
+            this.gvfsDatabase = new GVFSDatabase(this.context.Tracer, this.context.FileSystem, this.context.Enlistment.EnlistmentRoot);
 
             this.BlobSizes = blobSizes;
             this.BlobSizes.Initialize();
@@ -94,7 +95,7 @@ namespace GVFS.Virtualization
                 repoMetadata,
                 fileSystemVirtualizer,
                 placeholders,
-                this.modifiedPaths);
+                this.gvfsDatabase);
 
             if (backgroundFileSystemTaskRunner != null)
             {
@@ -160,7 +161,7 @@ namespace GVFS.Virtualization
 
         public bool TryStart(out string error)
         {
-            this.modifiedPaths.RemoveEntriesWithParentFolderEntry(this.context.Tracer);
+            this.gvfsDatabase.RemoveEntriesWithParentFolderEntry();
 
             this.GitIndexProjection.Initialize(this.backgroundFileSystemTaskRunner);
 
@@ -212,10 +213,10 @@ namespace GVFS.Virtualization
                 this.GitIndexProjection = null;
             }
 
-            if (this.modifiedPaths != null)
+            if (this.gvfsDatabase != null)
             {
-                this.modifiedPaths.Dispose();
-                this.modifiedPaths = null;
+                this.gvfsDatabase.Dispose();
+                this.gvfsDatabase = null;
             }
 
             if (this.gitStatusCache != null)
@@ -320,7 +321,7 @@ namespace GVFS.Virtualization
 
         public IEnumerable<string> GetAllModifiedPaths()
         {
-            return this.modifiedPaths.GetAllModifiedPaths();
+            return this.gvfsDatabase.GetAllModifiedPaths();
         }
 
         public virtual void OnIndexFileChange()

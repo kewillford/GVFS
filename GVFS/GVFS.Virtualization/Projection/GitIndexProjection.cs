@@ -1,4 +1,5 @@
 ﻿using GVFS.Common;
+using GVFS.Common.Database;
 using GVFS.Common.Git;
 using GVFS.Common.Http;
 using GVFS.Common.NamedPipes;
@@ -42,7 +43,7 @@ namespace GVFS.Virtualization.Projection
         private GVFSContext context;
         private RepoMetadata repoMetadata;
         private FileSystemVirtualizer fileSystemVirtualizer;
-        private ModifiedPathsDatabase modifiedPaths;
+        private GVFSDatabase gvfsDatabase;
 
         private FolderData rootFolderData = new FolderData();
         private GitIndexParser indexParser;
@@ -91,7 +92,7 @@ namespace GVFS.Virtualization.Projection
             RepoMetadata repoMetadata,
             FileSystemVirtualizer fileSystemVirtualizer,
             PlaceholderListDatabase placeholderList,
-            ModifiedPathsDatabase modifiedPaths)
+            GVFSDatabase gvfsDatabase)
         {
             this.context = context;
             this.gitObjects = gitObjects;
@@ -106,7 +107,7 @@ namespace GVFS.Virtualization.Projection
             this.projectionIndexBackupPath = Path.Combine(this.context.Enlistment.DotGVFSRoot, ProjectionIndexBackupName);
             this.indexPath = Path.Combine(this.context.Enlistment.WorkingDirectoryRoot, GVFSConstants.DotGit.Index);
             this.placeholderList = placeholderList;
-            this.modifiedPaths = modifiedPaths;
+            this.gvfsDatabase = gvfsDatabase;
         }
 
         // For Unit Testing
