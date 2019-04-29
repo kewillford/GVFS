@@ -10,6 +10,7 @@ using GVFS.Virtualization.Projection;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -37,6 +38,7 @@ namespace GVFS.Virtualization
         private BackgroundFileSystemTaskRunner backgroundFileSystemTaskRunner;
         private FileSystemVirtualizer fileSystemVirtualizer;
         private FileProperties logsHeadFileProperties;
+        private ConcurrentDictionary<string, Stopwatch> timers;
 
         private GitStatusCache gitStatusCache;
         private bool enableGitStatusCache;
@@ -69,6 +71,7 @@ namespace GVFS.Virtualization
             this.context = context;
             this.fileSystemVirtualizer = fileSystemVirtualizer;
 
+            this.timers = new ConcurrentDictionary<string, Stopwatch>();
             this.placeHolderCreationCount = new ConcurrentDictionary<string, PlaceHolderCreateCounter>(StringComparer.OrdinalIgnoreCase);
             this.newlyCreatedFileAndFolderPaths = new ConcurrentHashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -553,6 +556,10 @@ namespace GVFS.Virtualization
 
         private FileSystemTaskResult PreBackgroundOperation()
         {
+            this.timers.Clear();
+            this.timers.TryAdd(nameof(this.TryAddModifiedPath), new Stopwatch());
+            this.timers.TryAdd(nameof(this.TryRemoveModifiedPath), new Stopwatch());
+            this.timers.TryAdd("RemoveFromPlaceholderList", new Stopwatch());
             return this.GitIndexProjection.OpenIndexForRead();
         }
 
@@ -561,6 +568,14 @@ namespace GVFS.Virtualization
             EventMetadata metadata = new EventMetadata();
 
             FileSystemTaskResult result;
+            if (!this.timers.ContainsKey(gitUpdate.Operation.ToString()))
+            {
+                this.timers[gitUpdate.Operation.ToString()] = Stopwatch.StartNew();
+            }
+            else
+            {
+                this.timers[gitUpdate.Operation.ToString()].Start();
+            }
 
             switch (gitUpdate.Operation)
             {
@@ -813,6 +828,7 @@ namespace GVFS.Virtualization
                 this.context.Tracer.RelatedEvent(EventLevel.Warning, "FailedBackgroundOperation", metadata);
             }
 
+            this.timers[gitUpdate.Operation.ToString()].Stop();
             return result;
         }
 
@@ -826,6 +842,7 @@ namespace GVFS.Virtualization
 
         private FileSystemTaskResult TryRemoveModifiedPath(string virtualPath, bool isFolder)
         {
+            this.timers[nameof(this.TryRemoveModifiedPath)].Start();
             if (!this.modifiedPaths.TryRemove(virtualPath, isFolder, out bool isRetryable))
             {
                 return isRetryable ? FileSystemTaskResult.RetryableError : FileSystemTaskResult.FatalError;
@@ -834,17 +851,20 @@ namespace GVFS.Virtualization
             this.newlyCreatedFileAndFolderPaths.TryRemove(virtualPath);
 
             this.InvalidateGitStatusCache();
+            this.timers[nameof(this.TryRemoveModifiedPath)].Stop();
             return FileSystemTaskResult.Success;
         }
 
         private FileSystemTaskResult TryAddModifiedPath(string virtualPath, bool isFolder)
         {
+            this.timers[nameof(this.TryAddModifiedPath)].Start();
             if (!this.modifiedPaths.TryAdd(virtualPath, isFolder, out bool isRetryable))
             {
                 return isRetryable ? FileSystemTaskResult.RetryableError : FileSystemTaskResult.FatalError;
             }
 
             this.InvalidateGitStatusCache();
+            this.timers[nameof(this.TryAddModifiedPath)].Stop();
             return FileSystemTaskResult.Success;
         }
 
@@ -859,6 +879,8 @@ namespace GVFS.Virtualization
             bool isFolder;
             string fileName;
 
+            this.timers["RemoveFromPlaceholderList"].Start();
+
             // We don't want to fill the placeholder list with deletes for files that are
             // not in the projection so we make sure it is in the projection before removing.
             if (this.GitIndexProjection.IsPathProjected(virtualPath, out fileName, out isFolder))
@@ -866,6 +888,7 @@ namespace GVFS.Virtualization
                 this.GitIndexProjection.RemoveFromPlaceholderList(virtualPath);
             }
 
+            this.timers["RemoveFromPlaceholderList"].Stop();
             return result;
         }
 
@@ -873,7 +896,18 @@ namespace GVFS.Virtualization
         {
             this.modifiedPaths.WriteAllEntriesAndFlush();
             this.gitStatusCache.RefreshAsynchronously();
-            return this.GitIndexProjection.CloseIndex();
+            FileSystemTaskResult result = this.GitIndexProjection.CloseIndex();
+
+            EventMetadata metadata = new EventMetadata();
+            metadata.Add("Area", EtwArea);
+            foreach (KeyValuePair<string, Stopwatch> timer in this.timers)
+            {
+                metadata.Add(timer.Key + "_TotalElapsed", timer.Value.Elapsed);
+            }
+
+            this.context.Tracer.RelatedInfo(metadata, "Timers for the background operations.");
+
+            return result;
         }
 
         private EventMetadata CreateEventMetadata(
