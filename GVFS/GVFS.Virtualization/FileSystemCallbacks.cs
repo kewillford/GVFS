@@ -605,18 +605,7 @@ namespace GVFS.Virtualization
                     if (this.newlyCreatedFileAndFolderPaths.Contains(gitUpdate.VirtualPath))
                     {
                         string fullPathToFile = Path.Combine(this.context.Enlistment.WorkingDirectoryRoot, gitUpdate.VirtualPath);
-
-                        // Because this is a predelete message the file could still be on disk when we make this check
-                        // so we retry for a limited time before deciding the delete didn't happen
-                        bool fileDeleted = CheckConditionWithRetry(() => !this.context.FileSystem.FileExists(fullPathToFile), NumberOfRetriesCheckingForDeleted, MillisecondsToSleepBeforeCheckingForDeleted);
-                        if (fileDeleted)
-                        {
-                            result = this.TryRemoveModifiedPath(gitUpdate.VirtualPath, isFolder: false);
-                        }
-                        else
-                        {
-                            result = FileSystemTaskResult.Success;
-                        }
+                        result = this.TryRemoveModifiedPath(gitUpdate.VirtualPath, isFolder: false);
                     }
                     else
                     {
