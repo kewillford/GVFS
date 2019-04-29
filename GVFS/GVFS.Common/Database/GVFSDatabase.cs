@@ -10,7 +10,6 @@ namespace GVFS.Common.Database
 {
     public class GVFSDatabase : IDisposable
     {
-        private readonly SqliteConnection connection;
         private PhysicalFileSystem fileSystem;
         private ITracer tracer;
         private string databasePath;
@@ -28,31 +27,27 @@ namespace GVFS.Common.Database
 
             bool databaseInitialized = fileSystem.FileExists(this.databasePath);
 
-            this.connection = new SqliteConnection(this.sqliteConnectionString);
-            this.connection.Open();
+            this.Connection = new SqliteConnection(this.sqliteConnectionString);
+            this.Connection.Open();
 
             if (!databaseInitialized)
             {
                 this.Initialize();
             }
+
+            this.CreateTables();
         }
+
+        public SqliteConnection Connection { get; }
 
         public void Dispose()
         {
-            this.connection?.Dispose();
-        }
-
-        public void RemoveEntriesWithParentFolderEntry()
-        {
-        }
-
-        public string[] GetAllModifiedPaths()
-        {
+            this.Connection?.Dispose();
         }
 
         private void Initialize()
         {
-            using (SqliteCommand command = this.connection.CreateCommand())
+            using (SqliteCommand command = this.Connection.CreateCommand())
             {
                 command.CommandText = $"PRAGMA journal_mode=WAL;";
                 command.ExecuteNonQuery();
@@ -67,9 +62,15 @@ namespace GVFS.Common.Database
                     command.CommandText = $"PRAGMA user_version=1;";
                     command.ExecuteNonQuery();
                 }
+            }
+        }
 
-                command.CommandText = @"CREATE TABLE IF NOT EXISTS [ModifiedPaths] (path TEXT PRIMARY KEY ) WITHOUT ROWID;";
-                command.ExecuteNonQuery();
+        private void CreateTables()
+        {
+            using (SqliteCommand command = this.Connection.CreateCommand())
+            {
+                ModifiedPaths.CreateTable(command);
+                Placeholders.CreateTable(command);
             }
         }
 
@@ -101,38 +102,6 @@ namespace GVFS.Common.Database
             {
                 command.Parameters.AddWithValue("@path", modifiedPath);
                 command.CommandText = $"DELETE FROM PlaceholderList WHERE path = @path;";
-                command.ExecuteNonQuery();
-            }
-        }
-
-        private class ModifiedPaths
-        {
-            public static void Insert(SqliteCommand command, string modifiedPath)
-            {
-                command.Parameters.AddWithValue("@path", modifiedPath);
-                command.CommandText = $"INSERT OR IGNORE INTO ModifiedPaths (path) VALUES (@path);";
-                command.ExecuteNonQuery();
-            }
-
-            public static string[] GetAll(SqliteCommand command)
-            {
-                List<string> pathList = new List<string>();
-                command.CommandText = $"SELECT path FROM ModifiedPaths;";
-                using (SqliteDataReader reader = command.ExecuteReader())
-                {
-                    while (reader.Read())
-                    {
-                        pathList.Add(reader.GetString(0));
-                    }
-                }
-
-                return pathList.ToArray();
-            }
-
-            public static void Delete(SqliteCommand command, string modifiedPath)
-            {
-                command.Parameters.AddWithValue("@path", modifiedPath);
-                command.CommandText = $"DELETE FROM ModifiedPaths WHERE path = @path;";
                 command.ExecuteNonQuery();
             }
         }

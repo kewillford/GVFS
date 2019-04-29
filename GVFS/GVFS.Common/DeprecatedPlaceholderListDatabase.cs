@@ -6,7 +6,7 @@ using System.IO;
 
 namespace GVFS.Common
 {
-    public class PlaceholderListDatabase : FileBasedCollection
+    public class DeprecatedPlaceholderListDatabase : FileBasedCollection
     {
         // Special folder values must:
         // - Be 40 characters long
@@ -40,7 +40,7 @@ namespace GVFS.Common
         // there is race potential between creating the queue, adding to the queue, and writing to the data file.
         private List<PlaceholderDataEntry> placeholderChangesWhileRebuildingList;
 
-        private PlaceholderListDatabase(ITracer tracer, PhysicalFileSystem fileSystem, string dataFilePath)
+        private DeprecatedPlaceholderListDatabase(ITracer tracer, PhysicalFileSystem fileSystem, string dataFilePath)
             : base(tracer, fileSystem, dataFilePath, collectionAppendsDirectlyToFile: true)
         {
         }
@@ -51,11 +51,11 @@ namespace GVFS.Common
         /// </summary>
         public int EstimatedCount { get; private set; }
 
-        public static bool TryCreate(ITracer tracer, string dataFilePath, PhysicalFileSystem fileSystem, out PlaceholderListDatabase output, out string error)
+        public static bool TryCreate(ITracer tracer, string dataFilePath, PhysicalFileSystem fileSystem, out DeprecatedPlaceholderListDatabase output, out string error)
         {
             using (ITracer activity = tracer.StartActivity("PlaceholderListDatabase.TryCreate", EventLevel.Informational))
             {
-                PlaceholderListDatabase temp = new PlaceholderListDatabase(tracer, fileSystem, dataFilePath);
+                DeprecatedPlaceholderListDatabase temp = new DeprecatedPlaceholderListDatabase(tracer, fileSystem, dataFilePath);
 
                 // We don't want to cache placeholders so this just serves to validate early and populate count.
                 if (!temp.TryLoadFromDisk<string, string>(
@@ -219,14 +219,14 @@ namespace GVFS.Common
             }
         }
 
-        public Dictionary<string, PlaceholderListDatabase.PlaceholderData> GetAllFileEntries()
+        public Dictionary<string, DeprecatedPlaceholderListDatabase.PlaceholderData> GetAllFileEntries()
         {
             try
             {
                 using (ITracer activity = this.Tracer.StartActivity("PlaceholderListDatabase.GetAllFileEntries", EventLevel.Informational))
                 {
-                    Dictionary<string, PlaceholderListDatabase.PlaceholderData> filePlaceholdersFromDiskByPath =
-                    new Dictionary<string, PlaceholderListDatabase.PlaceholderData>(Math.Max(1, this.EstimatedCount), StringComparer.Ordinal);
+                    Dictionary<string, DeprecatedPlaceholderListDatabase.PlaceholderData> filePlaceholdersFromDiskByPath =
+                        new Dictionary<string, DeprecatedPlaceholderListDatabase.PlaceholderData>(Math.Max(1, this.EstimatedCount), StringComparer.Ordinal);
 
                     string error;
                     if (!this.TryLoadFromDisk<string, string>(
@@ -366,7 +366,7 @@ namespace GVFS.Common
             return true;
         }
 
-        public class PlaceholderData
+        public class PlaceholderData : IPlaceholder
         {
             public PlaceholderData(string path, string fileShaOrFolderValue)
             {

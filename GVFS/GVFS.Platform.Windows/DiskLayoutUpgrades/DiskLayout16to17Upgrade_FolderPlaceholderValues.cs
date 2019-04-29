@@ -21,8 +21,8 @@ namespace GVFS.Platform.Windows.DiskLayoutUpgrades
             try
             {
                 string error;
-                PlaceholderListDatabase placeholders;
-                if (!PlaceholderListDatabase.TryCreate(
+                DeprecatedPlaceholderListDatabase placeholders;
+                if (!DeprecatedPlaceholderListDatabase.TryCreate(
                     tracer,
                     Path.Combine(dotGVFSRoot, GVFSConstants.DotGVFS.Databases.PlaceholderList),
                     new PhysicalFileSystem(),
@@ -35,14 +35,14 @@ namespace GVFS.Platform.Windows.DiskLayoutUpgrades
 
                 using (placeholders)
                 {
-                    List<PlaceholderListDatabase.PlaceholderData> oldPlaceholderEntries = placeholders.GetAllEntriesAndPrepToWriteAllEntries();
-                    List<PlaceholderListDatabase.PlaceholderData> newPlaceholderEntries = new List<PlaceholderListDatabase.PlaceholderData>();
+                    List<DeprecatedPlaceholderListDatabase.PlaceholderData> oldPlaceholderEntries = placeholders.GetAllEntriesAndPrepToWriteAllEntries();
+                    List<DeprecatedPlaceholderListDatabase.PlaceholderData> newPlaceholderEntries = new List<DeprecatedPlaceholderListDatabase.PlaceholderData>();
 
-                    foreach (PlaceholderListDatabase.PlaceholderData entry in oldPlaceholderEntries)
+                    foreach (DeprecatedPlaceholderListDatabase.PlaceholderData entry in oldPlaceholderEntries)
                     {
                         if (entry.Sha == GVFSConstants.AllZeroSha)
                         {
-                            newPlaceholderEntries.Add(new PlaceholderListDatabase.PlaceholderData(entry.Path, PlaceholderListDatabase.PartialFolderValue));
+                            newPlaceholderEntries.Add(new DeprecatedPlaceholderListDatabase.PlaceholderData(entry.Path, DeprecatedPlaceholderListDatabase.PartialFolderValue));
                         }
                         else
                         {

@@ -33,6 +33,7 @@ namespace GVFS.Virtualization
 
         private GVFSContext context;
         private GVFSDatabase gvfsDatabase;
+        private ModifiedPaths modifiedPaths;
         private ConcurrentHashSet<string> newlyCreatedFileAndFolderPaths;
         private ConcurrentDictionary<string, PlaceHolderCreateCounter> placeHolderCreationCount;
         private BackgroundFileSystemTaskRunner backgroundFileSystemTaskRunner;
@@ -73,21 +74,12 @@ namespace GVFS.Virtualization
             this.placeHolderCreationCount = new ConcurrentDictionary<string, PlaceHolderCreateCounter>(StringComparer.OrdinalIgnoreCase);
             this.newlyCreatedFileAndFolderPaths = new ConcurrentHashSet<string>(StringComparer.OrdinalIgnoreCase);
             this.gvfsDatabase = new GVFSDatabase(this.context.Tracer, this.context.FileSystem, this.context.Enlistment.EnlistmentRoot);
+            this.modifiedPaths = new ModifiedPaths(this.context.Tracer, this.gvfsDatabase.Connection);
 
             this.BlobSizes = blobSizes;
             this.BlobSizes.Initialize();
 
-            PlaceholderListDatabase placeholders;
-            if (!PlaceholderListDatabase.TryCreate(
-                this.context.Tracer,
-                Path.Combine(this.context.Enlistment.DotGVFSRoot, GVFSConstants.DotGVFS.Databases.PlaceholderList),
-                this.context.FileSystem,
-                out placeholders,
-                out string error))
-            {
-                throw new InvalidRepoException(error);
-            }
-
+            Placeholders placeholders = new Placeholders(this.gvfsDatabase.Connection);
             this.GitIndexProjection = gitIndexProjection ?? new GitIndexProjection(
                 context,
                 gitObjects,
@@ -95,7 +87,7 @@ namespace GVFS.Virtualization
                 repoMetadata,
                 fileSystemVirtualizer,
                 placeholders,
-                this.gvfsDatabase);
+                this.modifiedPaths);
 
             if (backgroundFileSystemTaskRunner != null)
             {
@@ -124,7 +116,7 @@ namespace GVFS.Virtualization
             this.logsHeadPath = Path.Combine(this.context.Enlistment.WorkingDirectoryRoot, GVFSConstants.DotGit.Logs.Head);
 
             EventMetadata metadata = new EventMetadata();
-            metadata.Add("placeholders.Count", placeholders.EstimatedCount);
+            metadata.Add("placeholders.Count", placeholders.Count());
             metadata.Add("background.Count", this.backgroundFileSystemTaskRunner.Count);
             metadata.Add(TracingConstants.MessageKey.InfoMessage, $"{nameof(FileSystemCallbacks)} created");
             this.context.Tracer.RelatedEvent(EventLevel.Informational, $"{nameof(FileSystemCallbacks)}_Constructor", metadata);
@@ -161,7 +153,7 @@ namespace GVFS.Virtualization
 
         public bool TryStart(out string error)
         {
-            this.gvfsDatabase.RemoveEntriesWithParentFolderEntry();
+            this.modifiedPaths.RemoveEntriesWithParentFolderEntry();
 
             this.GitIndexProjection.Initialize(this.backgroundFileSystemTaskRunner);
 
@@ -321,7 +313,7 @@ namespace GVFS.Virtualization
 
         public IEnumerable<string> GetAllModifiedPaths()
         {
-            return this.gvfsDatabase.GetAllModifiedPaths();
+            return this.modifiedPaths.GetAll();
         }
 
         public virtual void OnIndexFileChange()

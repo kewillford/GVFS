@@ -24,8 +24,8 @@ namespace GVFS.RepairJobs
         public override IssueType HasIssue(List<string> messages)
         {
             string error;
-            PlaceholderListDatabase placeholders;
-            if (!PlaceholderListDatabase.TryCreate(
+            DeprecatedPlaceholderListDatabase placeholders;
+            if (!DeprecatedPlaceholderListDatabase.TryCreate(
                 this.Tracer,
                 this.databasePath,
                 new PhysicalFileSystem(),

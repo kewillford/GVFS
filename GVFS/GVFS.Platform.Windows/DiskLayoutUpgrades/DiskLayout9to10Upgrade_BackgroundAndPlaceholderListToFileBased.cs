@@ -57,8 +57,8 @@ namespace GVFS.Platform.Windows.DiskLayoutUpgrades
                         new PersistentDictionary<string, string>(esentPlaceholderFolder))
                     {
                         string error;
-                        PlaceholderListDatabase newPlaceholders;
-                        if (!PlaceholderListDatabase.TryCreate(
+                        DeprecatedPlaceholderListDatabase newPlaceholders;
+                        if (!DeprecatedPlaceholderListDatabase.TryCreate(
                             tracer,
                             newPlaceholderFolder,
                             new PhysicalFileSystem(),
@@ -71,11 +71,11 @@ namespace GVFS.Platform.Windows.DiskLayoutUpgrades
 
                         using (newPlaceholders)
                         {
-                            List<PlaceholderListDatabase.PlaceholderData> data = new List<PlaceholderListDatabase.PlaceholderData>();
+                            List<DeprecatedPlaceholderListDatabase.PlaceholderData> data = new List<DeprecatedPlaceholderListDatabase.PlaceholderData>();
                             foreach (KeyValuePair<string, string> kvp in oldPlaceholders)
                             {
                                 tracer.RelatedInfo("Copying ESENT entry: {0} = {1}", kvp.Key, kvp.Value);
-                                data.Add(new PlaceholderListDatabase.PlaceholderData(path: kvp.Key, fileShaOrFolderValue: kvp.Value));
+                                data.Add(new DeprecatedPlaceholderListDatabase.PlaceholderData(path: kvp.Key, fileShaOrFolderValue: kvp.Value));
                             }
 
                             newPlaceholders.WriteAllEntriesAndFlush(data);
