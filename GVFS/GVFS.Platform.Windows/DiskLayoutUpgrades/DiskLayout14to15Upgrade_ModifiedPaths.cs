@@ -21,7 +21,7 @@ namespace GVFS.Platform.Windows.DiskLayoutUpgrades
 
                 string modifiedPathsDatabasePath = Path.Combine(enlistmentRoot, GVFSConstants.DotGVFS.Root, GVFSConstants.DotGVFS.Databases.ModifiedPaths);
                 string error;
-                if (!ModifiedPathsDatabase.TryLoadOrCreate(tracer, modifiedPathsDatabasePath, fileSystem, out modifiedPaths, out error))
+                if (!ModifiedPathsDatabase.TryLoadOrCreate(new MultiStopwatch(), tracer, modifiedPathsDatabasePath, fileSystem, out modifiedPaths, out error))
                 {
                     tracer.RelatedError($"Unable to create the modified paths database. {error}");
                     return false;

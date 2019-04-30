@@ -1,8 +1,10 @@
 ﻿using GVFS.Common.FileSystem;
 using GVFS.Common.Tracing;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -394,11 +396,8 @@ namespace GVFS.Common
             }
 
             byte[] bytes = Encoding.UTF8.GetBytes(value + NewLine);
-            lock (this.fileLock)
-            {
-                this.dataFileHandle.Write(bytes, 0, bytes.Length);
-                this.dataFileHandle.Flush();
-            }
+            this.dataFileHandle.Write(bytes, 0, bytes.Length);
+            this.dataFileHandle.Flush();
         }
 
         /// <summary>

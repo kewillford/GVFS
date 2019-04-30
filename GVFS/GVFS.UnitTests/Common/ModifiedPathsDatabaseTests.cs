@@ -61,7 +61,7 @@ A dir1/dir2
 
             string error;
             ModifiedPathsDatabase modifiedPathsDatabase;
-            ModifiedPathsDatabase.TryLoadOrCreate(null, MockEntryFileName, configurableFileSystem, out modifiedPathsDatabase, out error).ShouldBeFalse();
+            ModifiedPathsDatabase.TryLoadOrCreate(new MultiStopwatch(), new MockTracer(), MockEntryFileName, configurableFileSystem, out modifiedPathsDatabase, out error).ShouldBeFalse();
             modifiedPathsDatabase.ShouldBeNull();
         }
 
@@ -181,7 +181,7 @@ A dir1/dir2
 
             string error;
             ModifiedPathsDatabase modifiedPathsDatabase;
-            ModifiedPathsDatabase.TryLoadOrCreate(null, MockEntryFileName, configurableFileSystem, out modifiedPathsDatabase, out error).ShouldBeTrue();
+            ModifiedPathsDatabase.TryLoadOrCreate(new MultiStopwatch(), new MockTracer(), MockEntryFileName, configurableFileSystem, out modifiedPathsDatabase, out error).ShouldBeTrue();
             modifiedPathsDatabase.ShouldNotBeNull();
             return modifiedPathsDatabase;
         }

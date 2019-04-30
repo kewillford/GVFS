@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using GVFS.Common.FileSystem;
 using GVFS.Common.Tracing;
@@ -14,11 +15,13 @@ namespace GVFS.Common
     public class ModifiedPathsDatabase : FileBasedCollection
     {
         private ConcurrentHashSet<string> modifiedPaths;
+        private MultiStopwatch stopwatches;
 
-        protected ModifiedPathsDatabase(ITracer tracer, PhysicalFileSystem fileSystem, string dataFilePath)
+        protected ModifiedPathsDatabase(ITracer tracer, PhysicalFileSystem fileSystem, string dataFilePath, MultiStopwatch stopwatches)
             : base(tracer, fileSystem, dataFilePath, collectionAppendsDirectlyToFile: true)
         {
             this.modifiedPaths = new ConcurrentHashSet<string>(StringComparer.OrdinalIgnoreCase);
+            this.stopwatches = stopwatches ?? new MultiStopwatch();
         }
 
         public int Count
@@ -26,9 +29,9 @@ namespace GVFS.Common
             get { return this.modifiedPaths.Count; }
         }
 
-        public static bool TryLoadOrCreate(ITracer tracer, string dataDirectory, PhysicalFileSystem fileSystem, out ModifiedPathsDatabase output, out string error)
+        public static bool TryLoadOrCreate(MultiStopwatch stopwatches, ITracer tracer, string dataDirectory, PhysicalFileSystem fileSystem, out ModifiedPathsDatabase output, out string error)
         {
-            ModifiedPathsDatabase temp = new ModifiedPathsDatabase(tracer, fileSystem, dataDirectory);
+            ModifiedPathsDatabase temp = new ModifiedPathsDatabase(tracer, fileSystem, dataDirectory, stopwatches);
 
             if (!temp.TryLoadFromDisk<string, string>(
                 temp.TryParseAddLine,
@@ -96,7 +99,10 @@ namespace GVFS.Common
             {
                 try
                 {
-                    this.WriteAddEntry(entry, () => this.modifiedPaths.Add(entry));
+                    using (this.stopwatches.Start("ModifiedPathsDatabase.WriteAddEntry"))
+                    {
+                        this.WriteAddEntry(entry, () => this.modifiedPaths.Add(entry));
+                    }
                 }
                 catch (IOException e)
                 {
@@ -123,7 +129,10 @@ namespace GVFS.Common
                 isRetryable = true;
                 try
                 {
-                    this.WriteRemoveEntry(entry, () => this.modifiedPaths.TryRemove(entry));
+                    using (this.stopwatches.Start("ModifiedPathsDatabase.WriteRemoveEntry"))
+                    {
+                        this.WriteRemoveEntry(entry, () => this.modifiedPaths.TryRemove(entry));
+                    }
                 }
                 catch (IOException e)
                 {
@@ -145,7 +154,10 @@ namespace GVFS.Common
         {
             try
             {
-                this.WriteAndReplaceDataFile(this.GenerateDataLines);
+                using (this.stopwatches.Start("ModifiedPathsDatabase.WriteAndReplaceDataFile"))
+                {
+                    this.WriteAndReplaceDataFile(this.GenerateDataLines);
+                }
             }
             catch (Exception e)
             {
@@ -210,45 +222,51 @@ namespace GVFS.Common
 
         private bool ContainsParentDirectory(string modifiedPath)
         {
-            string[] pathParts = modifiedPath.Split(new char[] { GVFSConstants.GitPathSeparator }, StringSplitOptions.RemoveEmptyEntries);
-            string parentFolder = string.Empty;
-            for (int i = 0; i < pathParts.Length - 1; i++)
+            using (this.stopwatches.Start("ModifiedPathsDatabase.ContainsParentDirectory"))
             {
-                parentFolder += pathParts[i] + GVFSConstants.GitPathSeparatorString;
-                if (this.modifiedPaths.Contains(parentFolder))
+                string[] pathParts = modifiedPath.Split(new char[] { GVFSConstants.GitPathSeparator }, StringSplitOptions.RemoveEmptyEntries);
+                string parentFolder = string.Empty;
+                for (int i = 0; i < pathParts.Length - 1; i++)
                 {
-                    return true;
+                    parentFolder += pathParts[i] + GVFSConstants.GitPathSeparatorString;
+                    if (this.modifiedPaths.Contains(parentFolder))
+                    {
+                        return true;
+                    }
                 }
-            }
 
-            return false;
+                return false;
+            }
         }
 
         private string NormalizeEntryString(string virtualPath, bool isFolder)
         {
-            if (Path.DirectorySeparatorChar == GVFSConstants.GitPathSeparator)
+            using (this.stopwatches.Start("ModifiedPathsDatabase.NormalizeEntryString"))
             {
-                if (isFolder && !virtualPath.EndsWith(GVFSConstants.GitPathSeparatorString))
+                if (Path.DirectorySeparatorChar == GVFSConstants.GitPathSeparator)
                 {
-                    virtualPath = virtualPath + GVFSConstants.GitPathSeparator;
-                }
-                else if (!isFolder && virtualPath.EndsWith(GVFSConstants.GitPathSeparatorString))
-                {
-                    virtualPath = virtualPath.TrimEnd(GVFSConstants.GitPathSeparator);
-                }
+                    if (isFolder && !virtualPath.EndsWith(GVFSConstants.GitPathSeparatorString))
+                    {
+                        virtualPath = virtualPath + GVFSConstants.GitPathSeparator;
+                    }
+                    else if (!isFolder && virtualPath.EndsWith(GVFSConstants.GitPathSeparatorString))
+                    {
+                        virtualPath = virtualPath.TrimEnd(GVFSConstants.GitPathSeparator);
+                    }
 
-                if (virtualPath.StartsWith(GVFSConstants.GitPathSeparatorString))
-                {
-                    virtualPath = virtualPath.TrimStart(GVFSConstants.GitPathSeparator);
-                }
+                    if (virtualPath.StartsWith(GVFSConstants.GitPathSeparatorString))
+                    {
+                        virtualPath = virtualPath.TrimStart(GVFSConstants.GitPathSeparator);
+                    }
 
-                return virtualPath;
-            }
-            else
-            {
-                // TODO(Mac) This can be optimized if needed
-                return virtualPath.Replace(Path.DirectorySeparatorChar, GVFSConstants.GitPathSeparator).Trim(GVFSConstants.GitPathSeparator) +
-                    (isFolder ? GVFSConstants.GitPathSeparatorString : string.Empty);
+                    return virtualPath;
+                }
+                else
+                {
+                    // TODO(Mac) This can be optimized if needed
+                    return virtualPath.Replace(Path.DirectorySeparatorChar, GVFSConstants.GitPathSeparator).Trim(GVFSConstants.GitPathSeparator) +
+                        (isFolder ? GVFSConstants.GitPathSeparatorString : string.Empty);
+                }
             }
         }
     }
