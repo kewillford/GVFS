@@ -226,9 +226,30 @@ namespace GVFS.Common
 
         private string NormalizeEntryString(string virtualPath, bool isFolder)
         {
-            // TODO(Mac) This can be optimized if needed
-            return virtualPath.Replace(Path.DirectorySeparatorChar, GVFSConstants.GitPathSeparator).Trim(GVFSConstants.GitPathSeparator) +
-                (isFolder ? GVFSConstants.GitPathSeparatorString : string.Empty);
+            if (Path.DirectorySeparatorChar == GVFSConstants.GitPathSeparator)
+            {
+                if (isFolder && !virtualPath.EndsWith(GVFSConstants.GitPathSeparatorString))
+                {
+                    virtualPath = virtualPath + GVFSConstants.GitPathSeparator;
+                }
+                else if (!isFolder && virtualPath.EndsWith(GVFSConstants.GitPathSeparatorString))
+                {
+                    virtualPath = virtualPath.TrimEnd(GVFSConstants.GitPathSeparator);
+                }
+
+                if (virtualPath.StartsWith(GVFSConstants.GitPathSeparatorString))
+                {
+                    virtualPath = virtualPath.TrimStart(GVFSConstants.GitPathSeparator);
+                }
+
+                return virtualPath;
+            }
+            else
+            {
+                // TODO(Mac) This can be optimized if needed
+                return virtualPath.Replace(Path.DirectorySeparatorChar, GVFSConstants.GitPathSeparator).Trim(GVFSConstants.GitPathSeparator) +
+                    (isFolder ? GVFSConstants.GitPathSeparatorString : string.Empty);
+            }
         }
     }
 }
