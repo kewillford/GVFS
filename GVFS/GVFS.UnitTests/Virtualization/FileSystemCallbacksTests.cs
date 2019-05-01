@@ -288,33 +288,33 @@ namespace GVFS.UnitTests.Virtualization
             }
         }
 
-        [TestCase]
-        public void TestFileSystemOperationsInvalidateStatusCache()
-        {
-            using (MockBackgroundFileSystemTaskRunner backgroundTaskRunner = new MockBackgroundFileSystemTaskRunner())
-            using (MockFileSystemVirtualizer fileSystemVirtualizer = new MockFileSystemVirtualizer(this.Repo.Context, this.Repo.GitObjects))
-            using (MockGitIndexProjection gitIndexProjection = new MockGitIndexProjection(new[] { "test.txt" }))
-            using (MockGitStatusCache gitStatusCache = new MockGitStatusCache(this.Repo.Context, TimeSpan.Zero))
-            using (FileSystemCallbacks fileSystemCallbacks = new FileSystemCallbacks(
-                this.Repo.Context,
-                this.Repo.GitObjects,
-                RepoMetadata.Instance,
-                new MockBlobSizes(),
-                gitIndexProjection: gitIndexProjection,
-                backgroundFileSystemTaskRunner: backgroundTaskRunner,
-                fileSystemVirtualizer: fileSystemVirtualizer,
-                gitStatusCache: gitStatusCache))
-            {
-                this.ValidateActionInvalidatesStatusCache(backgroundTaskRunner, gitStatusCache, fileSystemCallbacks.OnFileConvertedToFull, "OnFileConvertedToFull.txt", FileSystemTask.OperationType.OnFileConvertedToFull);
-                this.ValidateActionInvalidatesStatusCache(backgroundTaskRunner, gitStatusCache, fileSystemCallbacks.OnFileCreated, "OnFileCreated.txt", FileSystemTask.OperationType.OnFileCreated);
-                this.ValidateActionInvalidatesStatusCache(backgroundTaskRunner, gitStatusCache, fileSystemCallbacks.OnFileDeleted, "OnFileDeleted.txt", FileSystemTask.OperationType.OnFileDeleted);
-                this.ValidateActionInvalidatesStatusCache(backgroundTaskRunner, gitStatusCache, fileSystemCallbacks.OnFileOverwritten, "OnFileDeleted.txt", FileSystemTask.OperationType.OnFileOverwritten);
-                this.ValidateActionInvalidatesStatusCache(backgroundTaskRunner, gitStatusCache, fileSystemCallbacks.OnFileSuperseded, "OnFileSuperseded.txt", FileSystemTask.OperationType.OnFileSuperseded);
-                this.ValidateActionInvalidatesStatusCache(backgroundTaskRunner, gitStatusCache, fileSystemCallbacks.OnFolderCreated, "OnFileSuperseded.txt", FileSystemTask.OperationType.OnFolderCreated);
-                this.ValidateActionInvalidatesStatusCache(backgroundTaskRunner, gitStatusCache, fileSystemCallbacks.OnFolderDeleted, "OnFileSuperseded.txt", FileSystemTask.OperationType.OnFolderDeleted);
-                this.ValidateActionInvalidatesStatusCache(backgroundTaskRunner, gitStatusCache, fileSystemCallbacks.OnFileConvertedToFull, "OnFileConvertedToFull.txt", FileSystemTask.OperationType.OnFileConvertedToFull);
-            }
-        }
+        ////[TestCase]
+        ////public void TestFileSystemOperationsInvalidateStatusCache()
+        ////{
+        ////    using (MockBackgroundFileSystemTaskRunner backgroundTaskRunner = new MockBackgroundFileSystemTaskRunner())
+        ////    using (MockFileSystemVirtualizer fileSystemVirtualizer = new MockFileSystemVirtualizer(this.Repo.Context, this.Repo.GitObjects))
+        ////    using (MockGitIndexProjection gitIndexProjection = new MockGitIndexProjection(new[] { "test.txt" }))
+        ////    using (MockGitStatusCache gitStatusCache = new MockGitStatusCache(this.Repo.Context, TimeSpan.Zero))
+        ////    using (FileSystemCallbacks fileSystemCallbacks = new FileSystemCallbacks(
+        ////        this.Repo.Context,
+        ////        this.Repo.GitObjects,
+        ////        RepoMetadata.Instance,
+        ////        new MockBlobSizes(),
+        ////        gitIndexProjection: gitIndexProjection,
+        ////        backgroundFileSystemTaskRunner: backgroundTaskRunner,
+        ////        fileSystemVirtualizer: fileSystemVirtualizer,
+        ////        gitStatusCache: gitStatusCache))
+        ////    {
+        ////        this.ValidateActionInvalidatesStatusCache(backgroundTaskRunner, gitStatusCache, fileSystemCallbacks.OnFileConvertedToFull, "OnFileConvertedToFull.txt", FileSystemTask.OperationType.OnFileConvertedToFull);
+        ////        this.ValidateActionInvalidatesStatusCache(backgroundTaskRunner, gitStatusCache, fileSystemCallbacks.OnFileCreated, "OnFileCreated.txt", FileSystemTask.OperationType.OnFileCreated);
+        ////        this.ValidateActionInvalidatesStatusCache(backgroundTaskRunner, gitStatusCache, fileSystemCallbacks.OnFileDeleted, "OnFileDeleted.txt", FileSystemTask.OperationType.OnFileDeleted);
+        ////        this.ValidateActionInvalidatesStatusCache(backgroundTaskRunner, gitStatusCache, fileSystemCallbacks.OnFileOverwritten, "OnFileDeleted.txt", FileSystemTask.OperationType.OnFileOverwritten);
+        ////        this.ValidateActionInvalidatesStatusCache(backgroundTaskRunner, gitStatusCache, fileSystemCallbacks.OnFileSuperseded, "OnFileSuperseded.txt", FileSystemTask.OperationType.OnFileSuperseded);
+        ////        this.ValidateActionInvalidatesStatusCache(backgroundTaskRunner, gitStatusCache, fileSystemCallbacks.OnFolderCreated, "OnFileSuperseded.txt", FileSystemTask.OperationType.OnFolderCreated);
+        ////        this.ValidateActionInvalidatesStatusCache(backgroundTaskRunner, gitStatusCache, fileSystemCallbacks.OnFolderDeleted, "OnFileSuperseded.txt", FileSystemTask.OperationType.OnFolderDeleted);
+        ////        this.ValidateActionInvalidatesStatusCache(backgroundTaskRunner, gitStatusCache, fileSystemCallbacks.OnFileConvertedToFull, "OnFileConvertedToFull.txt", FileSystemTask.OperationType.OnFileConvertedToFull);
+        ////    }
+        ////}
 
         private void ValidateActionInvalidatesStatusCache(
             MockBackgroundFileSystemTaskRunner backgroundTaskRunner,

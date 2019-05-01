@@ -356,14 +356,14 @@ namespace GVFS.Virtualization
 
         public void InvalidateGitStatusCache()
         {
-            this.gitStatusCache.Invalidate();
+            ////this.gitStatusCache.Invalidate();
 
-            // If there are background tasks queued up, then it will be
-            // refreshed after they have been processed.
-            if (this.backgroundFileSystemTaskRunner.IsEmpty)
-            {
-                this.gitStatusCache.RefreshAsynchronously();
-            }
+            ////// If there are background tasks queued up, then it will be
+            ////// refreshed after they have been processed.
+            ////if (this.backgroundFileSystemTaskRunner.IsEmpty)
+            ////{
+            ////    this.gitStatusCache.RefreshAsynchronously();
+            ////}
         }
 
         public virtual void OnLogsHeadChange()
