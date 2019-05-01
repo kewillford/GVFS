@@ -22,6 +22,18 @@ namespace GVFS.Virtualization.Background
         {
         }
 
+        public bool IsEmpty
+        {
+            get { return this.data.IsEmpty; }
+        }
+
+        /// <summary>
+        /// Gets the count of items in the queue
+        /// </summary>
+        /// <remarks>
+        /// This is an expensive call on .net core and you should avoid calling
+        /// in performance critical paths.  Use the IsEmpty property instead.
+        /// </remarks>
         public int Count
         {
             get { return this.data.Count; }
@@ -75,7 +87,7 @@ namespace GVFS.Virtualization.Background
 
                     this.WriteRemoveEntry(kvp.Key.ToString());
 
-                    this.DeleteDataFileIfCondition(() => this.data.Count == 0);
+                    this.DeleteDataFileIfCondition(() => this.data.IsEmpty);
                 }
                 else
                 {
