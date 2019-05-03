@@ -1,6 +1,7 @@
 ﻿using GVFS.Common;
 using GVFS.Tests.Should;
 using GVFS.UnitTests.Mock;
+using GVFS.UnitTests.Mock.Common;
 using GVFS.UnitTests.Mock.FileSystem;
 using NUnit.Framework;
 using System.Collections.Generic;
@@ -74,7 +75,7 @@ namespace GVFS.UnitTests.Common
 
             string error;
             PlaceholderListDatabase dut2;
-            PlaceholderListDatabase.TryCreate(null, MockEntryFileName, fs, out dut2, out error).ShouldEqual(true, error);
+            PlaceholderListDatabase.TryCreate(new MockTracer(), MockEntryFileName, fs, out dut2, out error).ShouldEqual(true, error);
             List<PlaceholderListDatabase.PlaceholderData> allData = dut2.GetAllEntriesAndPrepToWriteAllEntries();
             allData.Count.ShouldEqual(2);
         }
@@ -96,7 +97,7 @@ namespace GVFS.UnitTests.Common
 
             string error;
             PlaceholderListDatabase dut2;
-            PlaceholderListDatabase.TryCreate(null, MockEntryFileName, fs, out dut2, out error).ShouldEqual(true, error);
+            PlaceholderListDatabase.TryCreate(new MockTracer(), MockEntryFileName, fs, out dut2, out error).ShouldEqual(true, error);
             List<PlaceholderListDatabase.PlaceholderData> fileData;
             List<PlaceholderListDatabase.PlaceholderData> folderData;
             dut2.GetAllEntriesAndPrepToWriteAllEntries(out fileData, out folderData);
@@ -170,7 +171,7 @@ namespace GVFS.UnitTests.Common
 
             string error;
             PlaceholderListDatabase dut;
-            PlaceholderListDatabase.TryCreate(null, MockEntryFileName, fs, out dut, out error).ShouldEqual(true, error);
+            PlaceholderListDatabase.TryCreate(new MockTracer(), MockEntryFileName, fs, out dut, out error).ShouldEqual(true, error);
             dut.ShouldNotBeNull();
             return dut;
         }

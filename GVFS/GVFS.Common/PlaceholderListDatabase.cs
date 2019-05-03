@@ -53,23 +53,26 @@ namespace GVFS.Common
 
         public static bool TryCreate(ITracer tracer, string dataFilePath, PhysicalFileSystem fileSystem, out PlaceholderListDatabase output, out string error)
         {
-            PlaceholderListDatabase temp = new PlaceholderListDatabase(tracer, fileSystem, dataFilePath);
-
-            // We don't want to cache placeholders so this just serves to validate early and populate count.
-            if (!temp.TryLoadFromDisk<string, string>(
-                temp.TryParseAddLine,
-                temp.TryParseRemoveLine,
-                (key, value) => temp.EstimatedCount++,
-                out error))
+            using (ITracer activity = tracer.StartActivity("PlaceholderListDatabase.TryCreate", EventLevel.Informational))
             {
-                temp = null;
-                output = null;
-                return false;
-            }
+                PlaceholderListDatabase temp = new PlaceholderListDatabase(tracer, fileSystem, dataFilePath);
 
-            error = null;
-            output = temp;
-            return true;
+                // We don't want to cache placeholders so this just serves to validate early and populate count.
+                if (!temp.TryLoadFromDisk<string, string>(
+                    temp.TryParseAddLine,
+                    temp.TryParseRemoveLine,
+                    (key, value) => temp.EstimatedCount++,
+                    out error))
+                {
+                    temp = null;
+                    output = null;
+                    return false;
+                }
+
+                error = null;
+                output = temp;
+                return true;
+            }
         }
 
         public void AddAndFlushFile(string path, string sha)
@@ -124,28 +127,31 @@ namespace GVFS.Common
         {
             try
             {
-                List<PlaceholderData> placeholders = new List<PlaceholderData>(Math.Max(1, this.EstimatedCount));
-
-                string error;
-                if (!this.TryLoadFromDisk<string, string>(
-                    this.TryParseAddLine,
-                    this.TryParseRemoveLine,
-                    (key, value) => placeholders.Add(new PlaceholderData(path: key, fileShaOrFolderValue: value)),
-                    out error,
-                    () =>
-                    {
-                        if (this.placeholderChangesWhileRebuildingList != null)
-                        {
-                        throw new InvalidOperationException($"PlaceholderListDatabase should always flush queue placeholders using WriteAllEntriesAndFlush before calling {nameof(this.GetAllEntriesAndPrepToWriteAllEntries)} again.");
-                        }
-
-                        this.placeholderChangesWhileRebuildingList = new List<PlaceholderDataEntry>();
-                    }))
+                using (ITracer activity = this.Tracer.StartActivity("PlaceholderListDatabase.GetAllEntriesAndPrepToWriteAllEntries", EventLevel.Informational))
                 {
-                    throw new InvalidDataException(error);
-                }
+                    List<PlaceholderData> placeholders = new List<PlaceholderData>(Math.Max(1, this.EstimatedCount));
 
-                return placeholders;
+                    string error;
+                    if (!this.TryLoadFromDisk<string, string>(
+                        this.TryParseAddLine,
+                        this.TryParseRemoveLine,
+                        (key, value) => placeholders.Add(new PlaceholderData(path: key, fileShaOrFolderValue: value)),
+                        out error,
+                        () =>
+                        {
+                            if (this.placeholderChangesWhileRebuildingList != null)
+                            {
+                                throw new InvalidOperationException($"PlaceholderListDatabase should always flush queue placeholders using WriteAllEntriesAndFlush before calling {nameof(this.GetAllEntriesAndPrepToWriteAllEntries)} again.");
+                            }
+
+                            this.placeholderChangesWhileRebuildingList = new List<PlaceholderDataEntry>();
+                        }))
+                    {
+                        throw new InvalidDataException(error);
+                    }
+
+                    return placeholders;
+                }
             }
             catch (Exception e)
             {
@@ -169,40 +175,43 @@ namespace GVFS.Common
         {
             try
             {
-                List<PlaceholderData> filePlaceholdersFromDisk = new List<PlaceholderData>(Math.Max(1, this.EstimatedCount));
-                List<PlaceholderData> folderPlaceholdersFromDisk = new List<PlaceholderData>(Math.Max(1, (int)(this.EstimatedCount * .3)));
-
-                string error;
-                if (!this.TryLoadFromDisk<string, string>(
-                    this.TryParseAddLine,
-                    this.TryParseRemoveLine,
-                    (key, value) =>
-                    {
-                        if (PlaceholderData.IsShaAFolder(value))
-                        {
-                            folderPlaceholdersFromDisk.Add(new PlaceholderData(path: key, fileShaOrFolderValue: value));
-                        }
-                        else
-                        {
-                            filePlaceholdersFromDisk.Add(new PlaceholderData(path: key, fileShaOrFolderValue: value));
-                        }
-                    },
-                    out error,
-                    () =>
-                    {
-                        if (this.placeholderChangesWhileRebuildingList != null)
-                        {
-                            throw new InvalidOperationException($"PlaceholderListDatabase should always flush queue placeholders using WriteAllEntriesAndFlush before calling {(nameof(this.GetAllEntriesAndPrepToWriteAllEntries))} again.");
-                        }
-
-                        this.placeholderChangesWhileRebuildingList = new List<PlaceholderDataEntry>();
-                    }))
+                using (ITracer activity = this.Tracer.StartActivity("PlaceholderListDatabase.GetAllEntriesAndPrepToWriteAllEntries files and folders", EventLevel.Informational))
                 {
-                    throw new InvalidDataException(error);
-                }
+                    List<PlaceholderData> filePlaceholdersFromDisk = new List<PlaceholderData>(Math.Max(1, this.EstimatedCount));
+                    List<PlaceholderData> folderPlaceholdersFromDisk = new List<PlaceholderData>(Math.Max(1, (int)(this.EstimatedCount * .3)));
 
-                filePlaceholders = filePlaceholdersFromDisk;
-                folderPlaceholders = folderPlaceholdersFromDisk;
+                    string error;
+                    if (!this.TryLoadFromDisk<string, string>(
+                        this.TryParseAddLine,
+                        this.TryParseRemoveLine,
+                        (key, value) =>
+                        {
+                            if (PlaceholderData.IsShaAFolder(value))
+                            {
+                                folderPlaceholdersFromDisk.Add(new PlaceholderData(path: key, fileShaOrFolderValue: value));
+                            }
+                            else
+                            {
+                                filePlaceholdersFromDisk.Add(new PlaceholderData(path: key, fileShaOrFolderValue: value));
+                            }
+                        },
+                        out error,
+                        () =>
+                        {
+                            if (this.placeholderChangesWhileRebuildingList != null)
+                            {
+                                throw new InvalidOperationException($"PlaceholderListDatabase should always flush queue placeholders using WriteAllEntriesAndFlush before calling {(nameof(this.GetAllEntriesAndPrepToWriteAllEntries))} again.");
+                            }
+
+                            this.placeholderChangesWhileRebuildingList = new List<PlaceholderDataEntry>();
+                        }))
+                    {
+                        throw new InvalidDataException(error);
+                    }
+
+                    filePlaceholders = filePlaceholdersFromDisk;
+                    folderPlaceholders = folderPlaceholdersFromDisk;
+                }
             }
             catch (Exception e)
             {
@@ -214,26 +223,29 @@ namespace GVFS.Common
         {
             try
             {
-                Dictionary<string, PlaceholderListDatabase.PlaceholderData> filePlaceholdersFromDiskByPath =
+                using (ITracer activity = this.Tracer.StartActivity("PlaceholderListDatabase.GetAllFileEntries", EventLevel.Informational))
+                {
+                    Dictionary<string, PlaceholderListDatabase.PlaceholderData> filePlaceholdersFromDiskByPath =
                     new Dictionary<string, PlaceholderListDatabase.PlaceholderData>(Math.Max(1, this.EstimatedCount), StringComparer.Ordinal);
 
-                string error;
-                if (!this.TryLoadFromDisk<string, string>(
-                    this.TryParseAddLine,
-                    this.TryParseRemoveLine,
-                    (key, value) =>
-                    {
-                        if (!PlaceholderData.IsShaAFolder(value))
+                    string error;
+                    if (!this.TryLoadFromDisk<string, string>(
+                        this.TryParseAddLine,
+                        this.TryParseRemoveLine,
+                        (key, value) =>
                         {
-                            filePlaceholdersFromDiskByPath[key] = new PlaceholderData(path: key, fileShaOrFolderValue: value);
-                        }
-                    },
-                    out error))
-                {
-                    throw new InvalidDataException(error);
-                }
+                            if (!PlaceholderData.IsShaAFolder(value))
+                            {
+                                filePlaceholdersFromDiskByPath[key] = new PlaceholderData(path: key, fileShaOrFolderValue: value);
+                            }
+                        },
+                        out error))
+                    {
+                        throw new InvalidDataException(error);
+                    }
 
-                return filePlaceholdersFromDiskByPath;
+                    return filePlaceholdersFromDiskByPath;
+                }
             }
             catch (Exception e)
             {
@@ -245,7 +257,10 @@ namespace GVFS.Common
         {
             try
             {
-                this.WriteAndReplaceDataFile(() => this.GenerateDataLines(updatedPlaceholders));
+                using (ITracer activity = this.Tracer.StartActivity("PlaceholderListDatabase.WriteAllEntriesAndFlush", EventLevel.Informational))
+                {
+                    this.WriteAndReplaceDataFile(() => this.GenerateDataLines(updatedPlaceholders));
+                }
             }
             catch (Exception e)
             {
