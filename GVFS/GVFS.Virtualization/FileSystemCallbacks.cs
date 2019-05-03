@@ -79,7 +79,7 @@ namespace GVFS.Virtualization
             this.BlobSizes = blobSizes;
             this.BlobSizes.Initialize();
 
-            Placeholders placeholders = new Placeholders(this.gvfsDatabase.Connection);
+            Placeholders placeholders = new Placeholders(context.Tracer, this.gvfsDatabase.Connection);
             this.GitIndexProjection = gitIndexProjection ?? new GitIndexProjection(
                 context,
                 gitObjects,

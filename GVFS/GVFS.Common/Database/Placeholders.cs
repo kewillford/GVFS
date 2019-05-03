@@ -1,16 +1,18 @@
-﻿using Microsoft.Data.Sqlite;
+﻿using GVFS.Common.Tracing;
+using Microsoft.Data.Sqlite;
 using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace GVFS.Common.Database
 {
     public class Placeholders : IFilePlaceholderStore
     {
         private SqliteConnection connection;
+        private ITracer tracer;
 
-        public Placeholders(SqliteConnection connection)
+        public Placeholders(ITracer tracer, SqliteConnection connection)
         {
+            this.tracer = tracer;
             this.connection = connection;
         }
 
@@ -22,6 +24,7 @@ namespace GVFS.Common.Database
 
         public int Count()
         {
+            using (ITracer activity = this.tracer.StartActivity("Placeholders.Count", EventLevel.Informational))
             using (SqliteCommand command = this.connection.CreateCommand())
             {
                 command.CommandText = $"SELECT count(path) FROM Placeholders;";
@@ -33,6 +36,7 @@ namespace GVFS.Common.Database
         {
             filePlaceholders = new List<IPlaceholder>();
             folderPlaceholders = new List<IPlaceholder>();
+            using (ITracer activity = this.tracer.StartActivity("Placeholders.GetAllEntries", EventLevel.Informational))
             using (SqliteCommand command = this.connection.CreateCommand())
             {
                 command.CommandText = $"SELECT path, pathType, sha FROM Placeholders;";
@@ -64,6 +68,7 @@ namespace GVFS.Common.Database
 
         public HashSet<string> GetAllFileEntries()
         {
+            using (ITracer activity = this.tracer.StartActivity("Placeholders.GetAllFileEntries", EventLevel.Informational))
             using (SqliteCommand command = this.connection.CreateCommand())
             {
                 HashSet<string> fileEntries = new HashSet<string>();
