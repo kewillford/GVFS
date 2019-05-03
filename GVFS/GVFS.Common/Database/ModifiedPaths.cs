@@ -36,6 +36,7 @@ namespace GVFS.Common.Database
         {
             command.CommandText = @"CREATE TABLE IF NOT EXISTS [ModifiedPaths] (path TEXT PRIMARY KEY ) WITHOUT ROWID;";
             command.ExecuteNonQuery();
+            Insert(command, GVFSConstants.SpecialGitFiles.GitAttributes);
         }
 
         public void RemoveEntriesWithParentFolderEntry()
