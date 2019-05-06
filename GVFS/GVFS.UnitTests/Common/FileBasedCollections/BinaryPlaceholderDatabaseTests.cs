@@ -2,6 +2,7 @@
 using GVFS.Common.FileBasedCollections;
 using GVFS.Tests.Should;
 using GVFS.UnitTests.Mock;
+using GVFS.UnitTests.Mock.Common;
 using GVFS.UnitTests.Mock.FileSystem;
 using NUnit.Framework;
 using System;
@@ -109,7 +110,7 @@ namespace GVFS.UnitTests.Common.FileBasedCollections
 
             string error;
             BinaryPlaceholderListDatabase dut2;
-            BinaryPlaceholderListDatabase.TryCreate(null, MockEntryFileName, fs, out dut2, out error).ShouldEqual(true, error);
+            BinaryPlaceholderListDatabase.TryCreate(new MockTracer(), MockEntryFileName, fs, out dut2, out error).ShouldEqual(true, error);
             List<PlaceholderEvent> allData = dut2.GetAllEntriesAndPrepToWriteAllEntries();
             allData.Count.ShouldEqual(2);
         }
@@ -130,7 +131,7 @@ namespace GVFS.UnitTests.Common.FileBasedCollections
 
             string error;
             BinaryPlaceholderListDatabase dut2;
-            BinaryPlaceholderListDatabase.TryCreate(null, MockEntryFileName, fs, out dut2, out error).ShouldEqual(true, error);
+            BinaryPlaceholderListDatabase.TryCreate(new MockTracer(), MockEntryFileName, fs, out dut2, out error).ShouldEqual(true, error);
             IReadOnlyList<AddFileEntry> fileData;
             IReadOnlyList<AddFolderEntry> folderData;
             dut2.GetAllEntriesAndPrepToWriteAllEntries(out fileData, out folderData);
@@ -239,7 +240,7 @@ namespace GVFS.UnitTests.Common.FileBasedCollections
 
             string error;
             BinaryPlaceholderListDatabase dut2;
-            BinaryPlaceholderListDatabase.TryCreate(null, MockEntryFileName, fs, out dut2, out error).ShouldEqual(true, error);
+            BinaryPlaceholderListDatabase.TryCreate(new MockTracer(), MockEntryFileName, fs, out dut2, out error).ShouldEqual(true, error);
             sw.Restart();
             List<PlaceholderEvent> allData = dut2.GetAllEntriesAndPrepToWriteAllEntries();
             sw.Stop();
@@ -264,7 +265,7 @@ namespace GVFS.UnitTests.Common.FileBasedCollections
 
             string error;
             BinaryPlaceholderListDatabase dut;
-            BinaryPlaceholderListDatabase.TryCreate(null, MockEntryFileName, fs, out dut, out error).ShouldEqual(true, error);
+            BinaryPlaceholderListDatabase.TryCreate(new MockTracer(), MockEntryFileName, fs, out dut, out error).ShouldEqual(true, error);
             dut.ShouldNotBeNull();
             return dut;
         }
