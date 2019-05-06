@@ -3,6 +3,7 @@ using GVFS.Common.FileSystem;
 using GVFS.Common.Tracing;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
@@ -114,29 +115,32 @@ namespace GVFS.Common.FileBasedCollections
         {
             try
             {
-                Dictionary<string, PlaceholderEvent> placeholders = new Dictionary<string, PlaceholderEvent>(Math.Max(1, this.EstimatedCount));
-
-                string error;
-                if (!this.TryLoadFromDisk<string, PlaceholderEvent>(
-                    this.TryParseAddLine,
-                    this.TryParseRemoveLine,
-                    (key, value) => placeholders[key] = value,
-                    (key) => placeholders.Remove(key),
-                    out error,
-                    () =>
-                    {
-                        if (this.placeholderChangesWhileRebuildingList != null)
-                        {
-                            throw new InvalidOperationException($"BinaryPlaceholderListDatabase should always flush queue placeholders using WriteAllEntriesAndFlush before calling {nameof(this.GetAllEntriesAndPrepToWriteAllEntries)} again.");
-                        }
-
-                        this.placeholderChangesWhileRebuildingList = new List<Tuple<byte, PlaceholderEvent>>();
-                    }))
+                using (ITracer activity = this.Tracer.StartActivity("GetAllEntriesAndPrepToWriteAllEntries", EventLevel.Informational))
                 {
-                    throw new InvalidDataException(error);
-                }
+                    Dictionary<string, PlaceholderEvent> placeholders = new Dictionary<string, PlaceholderEvent>(Math.Max(1, this.EstimatedCount));
 
-                return placeholders.Values.ToList();
+                    string error;
+                    if (!this.TryLoadFromDisk<string, PlaceholderEvent>(
+                        this.TryParseAddLine,
+                        this.TryParseRemoveLine,
+                        (key, value) => placeholders[key] = value,
+                        (key) => placeholders.Remove(key),
+                        out error,
+                        () =>
+                        {
+                            if (this.placeholderChangesWhileRebuildingList != null)
+                            {
+                                throw new InvalidOperationException($"BinaryPlaceholderListDatabase should always flush queue placeholders using WriteAllEntriesAndFlush before calling {nameof(this.GetAllEntriesAndPrepToWriteAllEntries)} again.");
+                            }
+
+                            this.placeholderChangesWhileRebuildingList = new List<Tuple<byte, PlaceholderEvent>>();
+                        }))
+                    {
+                        throw new InvalidDataException(error);
+                    }
+
+                    return placeholders.Values.ToList();
+                }
             }
             catch (Exception e)
             {
@@ -160,49 +164,52 @@ namespace GVFS.Common.FileBasedCollections
         {
             try
             {
-                IDictionary<string, AddFileEntry> filePlaceholdersFromDisk = new Dictionary<string, AddFileEntry>(Math.Max(1, this.EstimatedCount));
-                IDictionary<string, AddFolderEntry> folderPlaceholdersFromDisk = new Dictionary<string, AddFolderEntry>(Math.Max(1, (int)(this.EstimatedCount * .3)));
-
-                if (!this.TryLoadFromDisk<string, PlaceholderEvent>(
-                    this.TryParseAddLine,
-                    this.TryParseRemoveLine,
-                    (key, value) =>
-                    {
-                        switch (value)
-                        {
-                            case AddFileEntry addFileEntry:
-                                filePlaceholdersFromDisk[key] = addFileEntry;
-                                break;
-                            case AddFolderEntry addFolderEntry:
-                                folderPlaceholdersFromDisk[key] = addFolderEntry;
-                                break;
-                            default:
-                                throw new ArgumentException($"Parsed value not of a supported type");
-                        }
-                    },
-                    (key) =>
-                    {
-                        if (!filePlaceholdersFromDisk.Remove(key))
-                        {
-                            folderPlaceholdersFromDisk.Remove(key);
-                        }
-                    },
-                    out string error,
-                    () =>
-                    {
-                        if (this.placeholderChangesWhileRebuildingList != null)
-                        {
-                            throw new InvalidOperationException($"BinaryPlaceholderListDatabase should always flush queue placeholders using WriteAllEntriesAndFlush before calling {(nameof(this.GetAllEntriesAndPrepToWriteAllEntries))} again.");
-                        }
-
-                        this.placeholderChangesWhileRebuildingList = new List<Tuple<byte, PlaceholderEvent>>();
-                    }))
+                using (ITracer activity = this.Tracer.StartActivity("void_GetAllEntriesAndPrepToWriteAllEntries", EventLevel.Informational))
                 {
-                    throw new InvalidDataException(error);
-                }
+                    IDictionary<string, AddFileEntry> filePlaceholdersFromDisk = new Dictionary<string, AddFileEntry>(Math.Max(1, this.EstimatedCount));
+                    IDictionary<string, AddFolderEntry> folderPlaceholdersFromDisk = new Dictionary<string, AddFolderEntry>(Math.Max(1, (int)(this.EstimatedCount * .3)));
 
-                filePlaceholders = filePlaceholdersFromDisk.Values.ToList();
-                folderPlaceholders = folderPlaceholdersFromDisk.Values.ToList();
+                    if (!this.TryLoadFromDisk<string, PlaceholderEvent>(
+                        this.TryParseAddLine,
+                        this.TryParseRemoveLine,
+                        (key, value) =>
+                        {
+                            switch (value)
+                            {
+                                case AddFileEntry addFileEntry:
+                                    filePlaceholdersFromDisk[key] = addFileEntry;
+                                    break;
+                                case AddFolderEntry addFolderEntry:
+                                    folderPlaceholdersFromDisk[key] = addFolderEntry;
+                                    break;
+                                default:
+                                    throw new ArgumentException($"Parsed value not of a supported type");
+                            }
+                        },
+                        (key) =>
+                        {
+                            if (!filePlaceholdersFromDisk.Remove(key))
+                            {
+                                folderPlaceholdersFromDisk.Remove(key);
+                            }
+                        },
+                        out string error,
+                        () =>
+                        {
+                            if (this.placeholderChangesWhileRebuildingList != null)
+                            {
+                                throw new InvalidOperationException($"BinaryPlaceholderListDatabase should always flush queue placeholders using WriteAllEntriesAndFlush before calling {(nameof(this.GetAllEntriesAndPrepToWriteAllEntries))} again.");
+                            }
+
+                            this.placeholderChangesWhileRebuildingList = new List<Tuple<byte, PlaceholderEvent>>();
+                        }))
+                    {
+                        throw new InvalidDataException(error);
+                    }
+
+                    filePlaceholders = filePlaceholdersFromDisk.Values.ToList();
+                    folderPlaceholders = folderPlaceholdersFromDisk.Values.ToList();
+                }
             }
             catch (Exception e)
             {
@@ -214,27 +221,30 @@ namespace GVFS.Common.FileBasedCollections
         {
             try
             {
-                Dictionary<string, AddFileEntry> filePlaceholdersFromDiskByPath =
+                using (ITracer activity = this.Tracer.StartActivity("GetAllFileEntries", EventLevel.Informational))
+                {
+                    Dictionary<string, AddFileEntry> filePlaceholdersFromDiskByPath =
                     new Dictionary<string, AddFileEntry>(Math.Max(1, this.EstimatedCount), StringComparer.Ordinal);
 
-                string error;
-                if (!this.TryLoadFromDisk<string, PlaceholderEvent>(
-                    this.TryParseAddLine,
-                    this.TryParseRemoveLine,
-                    (key, value) =>
-                    {
-                        if (value is AddFileEntry)
+                    string error;
+                    if (!this.TryLoadFromDisk<string, PlaceholderEvent>(
+                        this.TryParseAddLine,
+                        this.TryParseRemoveLine,
+                        (key, value) =>
                         {
-                            filePlaceholdersFromDiskByPath[key] = (AddFileEntry)value;
-                        }
-                    },
-                    key => filePlaceholdersFromDiskByPath.Remove(key),
-                    out error))
-                {
-                    throw new InvalidDataException(error);
-                }
+                            if (value is AddFileEntry)
+                            {
+                                filePlaceholdersFromDiskByPath[key] = (AddFileEntry)value;
+                            }
+                        },
+                        key => filePlaceholdersFromDiskByPath.Remove(key),
+                        out error))
+                    {
+                        throw new InvalidDataException(error);
+                    }
 
-                return filePlaceholdersFromDiskByPath;
+                    return filePlaceholdersFromDiskByPath;
+                }
             }
             catch (Exception e)
             {
@@ -246,7 +256,10 @@ namespace GVFS.Common.FileBasedCollections
         {
             try
             {
-                this.WriteAndReplaceDataFile(() => this.GenerateDataLines(updatedPlaceholders));
+                using (ITracer activity = this.Tracer.StartActivity("WriteAllEntriesAndFlush", EventLevel.Informational))
+                {
+                    this.WriteAndReplaceDataFile(() => this.GenerateDataLines(updatedPlaceholders));
+                }
             }
             catch (Exception e)
             {
