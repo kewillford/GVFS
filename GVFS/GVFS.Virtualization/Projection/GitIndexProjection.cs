@@ -1177,7 +1177,7 @@ namespace GVFS.Virtualization.Projection
                             // 3. Folder placeholder is a possible tombstone
                             if (!isProjected ||
                                 !isFolder ||
-                                folderPlaceholder.IsPossibleTombstoneFolder)
+                                folderPlaceholder.IsTombstoneFolder)
                             {
                                 keepFolder = !this.RemoveFolderPlaceholderIfEmpty(folderPlaceholder);
                                 ++deleteFolderPlaceholderAttempted;
@@ -1437,7 +1437,7 @@ namespace GVFS.Virtualization.Projection
                     Func<string, PlaceholderEvent> createPlaceholderEvent = null;
                     if (childEntry.IsFolder)
                     {
-                        createPlaceholderEvent = (path) => new AddFolderEntry(path, false);
+                        createPlaceholderEvent = (path) => new AddFolderEntry(path, false, false);
                         result = this.fileSystemVirtualizer.WritePlaceholderDirectory(childRelativePath);
                     }
                     else

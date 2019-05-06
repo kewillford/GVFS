@@ -74,7 +74,12 @@ namespace GVFS.Common.FileBasedCollections
 
         public void AddAndFlushFolder(string path, bool isExpanded)
         {
-            this.AddAndFlush(new AddFolderEntry(path, isExpanded));
+            this.AddAndFlush(new AddFolderEntry(path, isExpanded, isTombstoneFolder: false));
+        }
+
+        public void AddAndFlushPossibleTombstoneFolder(string path)
+        {
+            this.AddAndFlush(new AddFolderEntry(path, isExpandedFolder: false, isTombstoneFolder: true));
         }
 
         public void RemoveAndFlush(string path)
@@ -346,7 +351,8 @@ namespace GVFS.Common.FileBasedCollections
                     break;
                 case PlaceholderEvent.ExpandedFolderPrefix:
                 case PlaceholderEvent.PartialFolderPrefix:
-                    value = new AddFolderEntry(reader.ReadString(), type == PlaceholderEvent.ExpandedFolderPrefix);
+                case PlaceholderEvent.TombstoneFolderPrefix:
+                    value = new AddFolderEntry(reader.ReadString(), type == PlaceholderEvent.ExpandedFolderPrefix, type == PlaceholderEvent.TombstoneFolderPrefix);
                     break;
                 default:
                     key = null;

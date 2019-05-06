@@ -7,6 +7,7 @@ namespace GVFS.Common.FileBasedCollections
         public const byte FilePrefix = 1 << 0;
         public const byte PartialFolderPrefix = 1 << 1;
         public const byte ExpandedFolderPrefix = 1 << 2;
+        public const byte TombstoneFolderPrefix = 1 << 3;
 
         public readonly string Path;
 

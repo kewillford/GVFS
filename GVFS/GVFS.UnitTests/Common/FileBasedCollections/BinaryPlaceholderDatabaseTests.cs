@@ -125,6 +125,7 @@ namespace GVFS.UnitTests.Common.FileBasedCollections
                 dut1.AddAndFlushFolder("partialFolder", isExpanded: false);
                 dut1.AddAndFlushFile(InputGitAttributesPath, InputGitAttributesSHA);
                 dut1.AddAndFlushFolder("expandedFolder", isExpanded: true);
+                dut1.AddAndFlushPossibleTombstoneFolder("tombstoneFolder");
                 dut1.AddAndFlushFile(InputThirdFilePath, InputThirdFileSHA);
                 dut1.RemoveAndFlush(InputThirdFilePath);
             }
@@ -136,14 +137,15 @@ namespace GVFS.UnitTests.Common.FileBasedCollections
             IReadOnlyList<AddFolderEntry> folderData;
             dut2.GetAllEntriesAndPrepToWriteAllEntries(out fileData, out folderData);
             fileData.Count.ShouldEqual(2);
-            folderData.Count.ShouldEqual(2);
+            folderData.Count.ShouldEqual(3);
             folderData.ShouldContain(
                 new[]
                 {
-                    new AddFolderEntry("partialFolder", false),
-                    new AddFolderEntry("expandedFolder", true)
+                    new AddFolderEntry("partialFolder", false, false),
+                    new AddFolderEntry("expandedFolder", true, false),
+                    new AddFolderEntry("tombstoneFolder", false, true),
                 },
-                (data1, data2) => data1.Path == data2.Path && data1.IsExpandedFolder == data2.IsExpandedFolder);
+                (data1, data2) => data1.Path == data2.Path && data1.IsExpandedFolder == data2.IsExpandedFolder && data1.IsTombstoneFolder == data2.IsTombstoneFolder);
         }
 
         [TestCase]
