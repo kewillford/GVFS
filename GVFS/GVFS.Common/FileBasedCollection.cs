@@ -349,7 +349,7 @@ namespace GVFS.Common
                             FileMode.OpenOrCreate,
                             this.collectionAppendsDirectlyToFile ? FileAccess.ReadWrite : FileAccess.Read,
                             FileShare.Read,
-                            callFlushFileBuffers: false);
+                            callFlushFileBuffers: true);
                     }
 
                     this.dataFileHandle.Seek(0, SeekOrigin.End);
