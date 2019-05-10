@@ -1159,6 +1159,7 @@ namespace GVFS.Virtualization.Projection
                             // properly
                             if (GVFSPlatform.Instance.KernelDriver.EnumerationExpandsDirectories && folderPlaceholder.IsExpandedFolder)
                             {
+                                this.context.Tracer.RelatedInfo($"ReExpanding {folderPlaceholder.Path}");
                                 this.ReExpandFolder(blobSizesConnection, folderPlaceholder.Path, folderPlaceholders);
                             }
                         }
@@ -1344,6 +1345,7 @@ namespace GVFS.Virtualization.Projection
             if (!this.TryGetOrAddFolderDataFromCache(relativeFolderPath, out folderData))
             {
                 // Folder is no longer in the projection
+                this.context.Tracer.RelatedInfo($"ReExpandFolder: {relativeFolderPath} no longer in the projection");
                 return;
             }
 
@@ -1402,6 +1404,7 @@ namespace GVFS.Virtualization.Projection
                             // Remove the folder from existingFolderPlaceholders so that its parent will create
                             // it again (when it's re-expanded)
                             existingFolderPlaceholders.Remove(relativeFolderPath);
+                            this.context.Tracer.RelatedInfo($"ReExpandFolder: {relativeFolderPath} FileOrPathNotFound");
                             return;
 
                         default:
