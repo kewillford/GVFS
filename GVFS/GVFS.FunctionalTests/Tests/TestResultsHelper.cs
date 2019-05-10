@@ -1,4 +1,5 @@
 ﻿using GVFS.FunctionalTests.Tools;
+using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -15,11 +16,14 @@ namespace GVFS.FunctionalTests.Tests
                 return;
             }
 
-            Console.WriteLine("GVFS logs output attached below.\n\n");
-
-            foreach (string filename in GetAllFilesInDirectory(enlistment.GVFSLogsRoot))
+            if (TestContext.CurrentContext.Result.FailCount > 0)
             {
-                OutputFileContents(filename);
+                Console.WriteLine("GVFS logs output attached below.\n\n");
+
+                foreach (string filename in GetAllFilesInDirectory(enlistment.GVFSLogsRoot))
+                {
+                    OutputFileContents(filename);
+                }
             }
         }
 
