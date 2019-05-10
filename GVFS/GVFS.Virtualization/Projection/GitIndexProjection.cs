@@ -1344,7 +1344,6 @@ namespace GVFS.Virtualization.Projection
             if (!this.TryGetOrAddFolderDataFromCache(relativeFolderPath, out folderData))
             {
                 // Folder is no longer in the projection
-                this.placeholderDatabase.Remove(relativeFolderPath);
                 return;
             }
 
@@ -1403,7 +1402,6 @@ namespace GVFS.Virtualization.Projection
                             // Remove the folder from existingFolderPlaceholders so that its parent will create
                             // it again (when it's re-expanded)
                             existingFolderPlaceholders.Remove(relativeFolderPath);
-                            this.placeholderDatabase.Remove(relativeFolderPath);
                             return;
 
                         default:
