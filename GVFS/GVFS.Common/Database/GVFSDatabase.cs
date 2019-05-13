@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 using System;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Threading;
 
 namespace GVFS.Common.Database
 {
@@ -16,11 +17,12 @@ namespace GVFS.Common.Database
         private string databasePath;
         private string sqliteConnectionString;
         private BlockingCollection<SqliteConnection> connectionPool;
+        private long connectionCount = 0;
 
         public GVFSDatabase(ITracer tracer, PhysicalFileSystem fileSystem, string enlistmentRoot)
         {
             this.tracer = tracer;
-            this.connectionPool = new BlockingCollection<SqliteConnection>();
+            this.connectionPool = new BlockingCollection<SqliteConnection>(new ConcurrentBag<SqliteConnection>());
             this.databasePath = Path.Combine(enlistmentRoot, GVFSConstants.DotGVFS.Root, GVFSConstants.DotGVFS.Databases.GVFSDatabase);
             this.sqliteConnectionString = $"data source={this.databasePath};Cache=Shared;";
 
@@ -54,9 +56,10 @@ namespace GVFS.Common.Database
         public IPooledConnection GetPooledConnection()
         {
             SqliteConnection connection;
-            if (!this.connectionPool.TryTake(out connection, millisecondsTimeout: 500))
+            if (!this.connectionPool.TryTake(out connection, millisecondsTimeout: 100))
             {
                 connection = this.OpenNewConnection();
+                this.tracer.RelatedInfo($"New SqliteConnection opened. {Interlocked.Read(ref this.connectionCount)} total.");
             }
 
             return new GVFSConnection(this, connection);
@@ -96,6 +99,7 @@ namespace GVFS.Common.Database
         {
             SqliteConnection connection = new SqliteConnection(this.sqliteConnectionString);
             connection.Open();
+            Interlocked.Increment(ref this.connectionCount);
             return connection;
         }
 
