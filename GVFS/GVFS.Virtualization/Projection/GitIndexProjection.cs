@@ -1116,12 +1116,6 @@ namespace GVFS.Virtualization.Projection
                 int deleteFolderPlaceholderAttempted = 0;
                 using (BlobSizes.BlobSizesConnection blobSizesConnection = this.blobSizes.CreateConnection())
                 {
-                    // A hash of the folder placeholders is only required if the platform expands directories
-                    HashSet<string> folderPlaceholders =
-                        GVFSPlatform.Instance.KernelDriver.EnumerationExpandsDirectories ?
-                        new HashSet<string>(placeholderFoldersListCopy.Select(x => x.Path), StringComparer.OrdinalIgnoreCase) :
-                        null;
-
                     // Order the folders in decscending order so that we walk the tree from bottom up.
                     // Traversing the folders in this order:
                     //  1. Ensures child folders are deleted before their parents
@@ -1159,7 +1153,7 @@ namespace GVFS.Virtualization.Projection
                             // properly
                             if (GVFSPlatform.Instance.KernelDriver.EnumerationExpandsDirectories && folderPlaceholder.IsExpandedFolder)
                             {
-                                this.ReExpandFolder(blobSizesConnection, folderPlaceholder.Path, folderPlaceholders);
+                                this.ReExpandFolder(blobSizesConnection, folderPlaceholder.Path);
                             }
                         }
                         else
@@ -1335,10 +1329,7 @@ namespace GVFS.Virtualization.Projection
             return null;
         }
 
-        private void ReExpandFolder(
-            BlobSizes.BlobSizesConnection blobSizesConnection,
-            string relativeFolderPath,
-            HashSet<string> existingFolderPlaceholders)
+        private void ReExpandFolder(BlobSizes.BlobSizesConnection blobSizesConnection, string relativeFolderPath)
         {
             FolderData folderData;
             if (!this.TryGetOrAddFolderDataFromCache(relativeFolderPath, out folderData))
@@ -1369,9 +1360,7 @@ namespace GVFS.Virtualization.Projection
                     childRelativePath = relativeFolderPath + Path.DirectorySeparatorChar + childEntry.Name.GetString();
                 }
 
-                bool newChild = childEntry.IsFolder ? !existingFolderPlaceholders.Contains(childRelativePath) : !this.placeholderDatabase.Contains(childRelativePath);
-
-                if (newChild)
+                if (!this.placeholderDatabase.Contains(childRelativePath))
                 {
                     FileSystemResult result;
                     if (childEntry.IsFolder)
@@ -1400,11 +1389,10 @@ namespace GVFS.Virtualization.Projection
 
                         case FSResult.FileOrPathNotFound:
                             // Git command must have removed the folder being re-expanded (relativeFolderPath)
-                            // Remove the folder from existingFolderPlaceholders so that its parent will create
+                            // Remove the folder from placeholderDatabase so that its parent will create
                             // it again (when it's re-expanded)
-                            existingFolderPlaceholders.Remove(relativeFolderPath);
                             this.placeholderDatabase.Remove(relativeFolderPath);
-                            return;
+                            break;
 
                         default:
                             // TODO(Mac): Issue #245, handle failures of WritePlaceholderDirectory and WritePlaceholderFile
@@ -1531,17 +1519,13 @@ namespace GVFS.Virtualization.Projection
             switch (result.Result)
             {
                 case FSResult.Ok:
-                    if (deleteOperation)
-                    {
-                        this.placeholderDatabase.Remove(placeholder.Path);
-                    }
-                    else
+                    if (!deleteOperation)
                     {
                         this.placeholderDatabase.AddFile(placeholder.Path, projectedSha);
                         this.AddParentFoldersToListToKeep(parentKey, folderPlaceholdersToKeep);
                     }
 
-                    break;
+                    return;
 
                 case FSResult.IoReparseTagNotHandled:
                     // Attempted to update\delete a file that has a non-ProjFS reparse point
@@ -1598,7 +1582,6 @@ namespace GVFS.Virtualization.Projection
                     break;
 
                 case FSResult.FileOrPathNotFound:
-                    this.placeholderDatabase.Remove(placeholder.Path);
                     break;
 
                 default:
@@ -1620,6 +1603,8 @@ namespace GVFS.Virtualization.Projection
 
                     break;
             }
+
+            this.placeholderDatabase.Remove(placeholder.Path);
         }
 
         private void AddParentFoldersToListToKeep(string parentKey, ConcurrentHashSet<string> folderPlaceholdersToKeep)
