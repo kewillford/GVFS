@@ -9,7 +9,7 @@ namespace GVFS.Common.Database
 {
     public class GVFSDatabase : IDisposable
     {
-        private const int InitialPooledConnections = 3;
+        private const int InitialPooledConnections = 5;
 
         private bool disposed = false;
         private ITracer tracer;
@@ -20,7 +20,7 @@ namespace GVFS.Common.Database
         public GVFSDatabase(ITracer tracer, PhysicalFileSystem fileSystem, string enlistmentRoot)
         {
             this.tracer = tracer;
-            this.connectionPool = new BlockingCollection<SqliteConnection>();
+            this.connectionPool = new BlockingCollection<SqliteConnection>(new ConcurrentBag<SqliteConnection>());
             this.databasePath = Path.Combine(enlistmentRoot, GVFSConstants.DotGVFS.Root, GVFSConstants.DotGVFS.Databases.GVFSDatabase);
             this.sqliteConnectionString = $"data source={this.databasePath};Cache=Shared;";
 
