@@ -540,6 +540,7 @@ namespace GVFS.Virtualization
 
         private FileSystemTaskResult PreBackgroundOperation()
         {
+            this.context.Tracer.RelatedInfo("Starting Background processing.");
             return this.GitIndexProjection.OpenIndexForRead();
         }
 
@@ -858,6 +859,7 @@ namespace GVFS.Virtualization
 
         private FileSystemTaskResult PostBackgroundOperation()
         {
+            this.context.Tracer.RelatedInfo("Background processing finished.");
             this.modifiedPaths.WriteAllEntriesAndFlush();
             this.gitStatusCache.RefreshAsynchronously();
             return this.GitIndexProjection.CloseIndex();

@@ -41,6 +41,11 @@ namespace GVFS.Common.Database
             SqliteConnection Connection { get; }
         }
 
+        public ITracer Tracer
+        {
+            get { return this.tracer; }
+        }
+
         public void Dispose()
         {
             this.disposed = true;

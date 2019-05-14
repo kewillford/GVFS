@@ -1340,6 +1340,7 @@ namespace GVFS.Virtualization.Projection
             string relativeFolderPath,
             HashSet<string> existingFolderPlaceholders)
         {
+            this.context.Tracer.RelatedInfo($"GitIndexProjection.ReExpandFolder - {relativeFolderPath}");
             FolderData folderData;
             if (!this.TryGetOrAddFolderDataFromCache(relativeFolderPath, out folderData))
             {
@@ -1373,6 +1374,7 @@ namespace GVFS.Virtualization.Projection
 
                 if (newChild)
                 {
+                    this.context.Tracer.RelatedInfo($"GitIndexProjection.ReExpandFolder - newChild {childRelativePath} isFolder: {childEntry.IsFolder}");
                     FileSystemResult result;
                     if (childEntry.IsFolder)
                     {
@@ -1531,17 +1533,13 @@ namespace GVFS.Virtualization.Projection
             switch (result.Result)
             {
                 case FSResult.Ok:
-                    if (deleteOperation)
-                    {
-                        this.placeholderDatabase.Remove(placeholder.Path);
-                    }
-                    else
+                    if (!deleteOperation)
                     {
                         this.placeholderDatabase.AddFile(placeholder.Path, projectedSha);
                         this.AddParentFoldersToListToKeep(parentKey, folderPlaceholdersToKeep);
                     }
 
-                    break;
+                    return;
 
                 case FSResult.IoReparseTagNotHandled:
                     // Attempted to update\delete a file that has a non-ProjFS reparse point
@@ -1598,7 +1596,6 @@ namespace GVFS.Virtualization.Projection
                     break;
 
                 case FSResult.FileOrPathNotFound:
-                    this.placeholderDatabase.Remove(placeholder.Path);
                     break;
 
                 default:
@@ -1620,6 +1617,8 @@ namespace GVFS.Virtualization.Projection
 
                     break;
             }
+
+            this.placeholderDatabase.Remove(placeholder.Path);
         }
 
         private void AddParentFoldersToListToKeep(string parentKey, ConcurrentHashSet<string> folderPlaceholdersToKeep)

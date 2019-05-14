@@ -120,42 +120,47 @@ namespace GVFS.Common.Database
 
         public void AddFile(string path, string sha)
         {
+            this.database.Tracer.RelatedInfo($"Placeholders.AddFile - {path}");
             using (GVFSDatabase.IPooledConnection pooled = this.database.GetPooledConnection())
             using (SqliteCommand command = pooled.Connection.CreateCommand())
             {
-                Insert(command, new PlaceholderData() { Path = path, PathType = PlaceholderData.PlaceholderType.File, Sha = sha });
+                UpdateOrInsert(command, new PlaceholderData() { Path = path, PathType = PlaceholderData.PlaceholderType.File, Sha = sha });
             }
         }
 
         public void AddPartialFolder(string path)
         {
+            this.database.Tracer.RelatedInfo($"Placeholders.AddPartialFolder - {path}");
             using (GVFSDatabase.IPooledConnection pooled = this.database.GetPooledConnection())
             using (SqliteCommand command = pooled.Connection.CreateCommand())
             {
-                Insert(command, new PlaceholderData() { Path = path, PathType = PlaceholderData.PlaceholderType.PartialFolder });
+                UpdateOrInsert(command, new PlaceholderData() { Path = path, PathType = PlaceholderData.PlaceholderType.PartialFolder });
             }
         }
 
         public void AddExpandedFolder(string path)
         {
+            this.database.Tracer.RelatedInfo($"Placeholders.AddExpandedFolder - {path}");
             using (GVFSDatabase.IPooledConnection pooled = this.database.GetPooledConnection())
             using (SqliteCommand command = pooled.Connection.CreateCommand())
             {
-                Insert(command, new PlaceholderData() { Path = path, PathType = PlaceholderData.PlaceholderType.ExpandedFolder });
+                UpdateOrInsert(command, new PlaceholderData() { Path = path, PathType = PlaceholderData.PlaceholderType.ExpandedFolder });
             }
         }
 
         public void AddPossibleTombstoneFolder(string path)
         {
+            this.database.Tracer.RelatedInfo($"Placeholders.AddPossibleTombstoneFolder - {path}");
             using (GVFSDatabase.IPooledConnection pooled = this.database.GetPooledConnection())
             using (SqliteCommand command = pooled.Connection.CreateCommand())
             {
-                Insert(command, new PlaceholderData() { Path = path, PathType = PlaceholderData.PlaceholderType.PossibleTombstoneFolder });
+                UpdateOrInsert(command, new PlaceholderData() { Path = path, PathType = PlaceholderData.PlaceholderType.PossibleTombstoneFolder });
             }
         }
 
         public void Remove(string path)
         {
+            this.database.Tracer.RelatedInfo($"Placeholders.Remove - {path}");
             using (GVFSDatabase.IPooledConnection pooled = this.database.GetPooledConnection())
             using (SqliteCommand command = pooled.Connection.CreateCommand())
             {
@@ -163,9 +168,9 @@ namespace GVFS.Common.Database
             }
         }
 
-        private static void Insert(SqliteCommand command, PlaceholderData placeholder)
+        private static void UpdateOrInsert(SqliteCommand command, PlaceholderData placeholder)
         {
-            command.CommandText = $"INSERT OR REPLACE INTO Placeholders (path, pathType, sha) VALUES (@path, @pathType, @sha);";
+            command.CommandText = "UPDATE Placeholders SET pathType = @pathType, sha = @sha WHERE path = @path";
             command.Parameters.Add("@path", SqliteType.Text).Value = placeholder.Path;
             command.Parameters.Add("@pathType", SqliteType.Integer).Value = (byte)placeholder.PathType;
             if (placeholder.Sha == null)
@@ -177,7 +182,12 @@ namespace GVFS.Common.Database
                 command.Parameters.Add("@sha", SqliteType.Text).Value = placeholder.Sha;
             }
 
-            command.ExecuteNonQuery();
+            int rowsUpdated = command.ExecuteNonQuery();
+            if (rowsUpdated == 0)
+            {
+                command.CommandText = $"INSERT INTO Placeholders (path, pathType, sha) VALUES (@path, @pathType, @sha);";
+                command.ExecuteNonQuery();
+            }
         }
 
         private static void Delete(SqliteCommand command, string path)
