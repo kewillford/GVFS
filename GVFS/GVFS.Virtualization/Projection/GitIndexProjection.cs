@@ -1531,17 +1531,13 @@ namespace GVFS.Virtualization.Projection
             switch (result.Result)
             {
                 case FSResult.Ok:
-                    if (deleteOperation)
-                    {
-                        this.placeholderDatabase.Remove(placeholder.Path);
-                    }
-                    else
+                    if (!deleteOperation)
                     {
                         this.placeholderDatabase.AddFile(placeholder.Path, projectedSha);
                         this.AddParentFoldersToListToKeep(parentKey, folderPlaceholdersToKeep);
                     }
 
-                    break;
+                    return;
 
                 case FSResult.IoReparseTagNotHandled:
                     // Attempted to update\delete a file that has a non-ProjFS reparse point
@@ -1598,7 +1594,6 @@ namespace GVFS.Virtualization.Projection
                     break;
 
                 case FSResult.FileOrPathNotFound:
-                    this.placeholderDatabase.Remove(placeholder.Path);
                     break;
 
                 default:
@@ -1620,6 +1615,8 @@ namespace GVFS.Virtualization.Projection
 
                     break;
             }
+
+            this.placeholderDatabase.Remove(placeholder.Path);
         }
 
         private void AddParentFoldersToListToKeep(string parentKey, ConcurrentHashSet<string> folderPlaceholdersToKeep)
