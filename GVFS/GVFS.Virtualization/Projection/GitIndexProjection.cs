@@ -1084,6 +1084,7 @@ namespace GVFS.Virtualization.Projection
             Stopwatch stopwatch = new Stopwatch();
             List<IPlaceholderData> placeholderFilesListCopy;
             List<IPlaceholderData> placeholderFoldersListCopy;
+            this.context.Tracer.RelatedInfo($"Timings Before UpdatePlaceholders(): {this.placeholderDatabase.GetTimingData()}");
             this.placeholderDatabase.GetAllEntries(out placeholderFilesListCopy, out placeholderFoldersListCopy);
 
             EventMetadata metadata = new EventMetadata();
@@ -1180,6 +1181,7 @@ namespace GVFS.Virtualization.Projection
                     millisecondsUpdatingFolderPlaceholders,
                     millisecondsWriteAndFlush,
                     deleteFolderPlaceholderAttempted);
+                this.context.Tracer.RelatedInfo($"Timings During UpdatePlaceholders(): {this.placeholderDatabase.GetTimingData()}");
             }
         }
 

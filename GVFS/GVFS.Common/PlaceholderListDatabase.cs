@@ -69,6 +69,11 @@ namespace GVFS.Common
             return true;
         }
 
+        public string GetTimingData()
+        {
+            return string.Empty;
+        }
+
         /// <summary>
         /// The Count is "estimated" because it's simply (# adds - # deletes).  There is nothing to prevent
         /// multiple adds or deletes of the same path from being double counted

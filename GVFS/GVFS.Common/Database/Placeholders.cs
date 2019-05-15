@@ -1,13 +1,17 @@
 ﻿using Microsoft.Data.Sqlite;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Data;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace GVFS.Common.Database
 {
     public class Placeholders : IPlaceholderDatabase
     {
         private GVFSDatabase database;
+        private Stopwatches timers = new Stopwatches();
 
         public Placeholders(GVFSDatabase database)
         {
@@ -20,8 +24,14 @@ namespace GVFS.Common.Database
             command.ExecuteNonQuery();
         }
 
+        public string GetTimingData()
+        {
+            return this.timers.GetData();
+        }
+
         public int Count()
         {
+            using (this.timers.AddToTime())
             using (GVFSDatabase.IPooledConnection pooled = this.database.GetPooledConnection())
             using (SqliteCommand command = pooled.Connection.CreateCommand())
             {
@@ -34,6 +44,7 @@ namespace GVFS.Common.Database
         {
             filePlaceholders = new List<IPlaceholderData>();
             folderPlaceholders = new List<IPlaceholderData>();
+            using (this.timers.AddToTime())
             using (GVFSDatabase.IPooledConnection pooled = this.database.GetPooledConnection())
             using (SqliteCommand command = pooled.Connection.CreateCommand())
             {
@@ -66,6 +77,7 @@ namespace GVFS.Common.Database
 
         public HashSet<string> GetAllFilePaths()
         {
+            using (this.timers.AddToTime())
             using (GVFSDatabase.IPooledConnection pooled = this.database.GetPooledConnection())
             using (SqliteCommand command = pooled.Connection.CreateCommand())
             {
@@ -85,6 +97,7 @@ namespace GVFS.Common.Database
 
         public bool Contains(string path)
         {
+            using (this.timers.AddToTime())
             using (GVFSDatabase.IPooledConnection pooled = this.database.GetPooledConnection())
             using (SqliteCommand command = pooled.Connection.CreateCommand())
             {
@@ -120,6 +133,7 @@ namespace GVFS.Common.Database
 
         public void AddFile(string path, string sha)
         {
+            using (this.timers.AddToTime())
             using (GVFSDatabase.IPooledConnection pooled = this.database.GetPooledConnection())
             using (SqliteCommand command = pooled.Connection.CreateCommand())
             {
@@ -129,6 +143,7 @@ namespace GVFS.Common.Database
 
         public void AddPartialFolder(string path)
         {
+            using (this.timers.AddToTime())
             using (GVFSDatabase.IPooledConnection pooled = this.database.GetPooledConnection())
             using (SqliteCommand command = pooled.Connection.CreateCommand())
             {
@@ -138,6 +153,7 @@ namespace GVFS.Common.Database
 
         public void AddExpandedFolder(string path)
         {
+            using (this.timers.AddToTime())
             using (GVFSDatabase.IPooledConnection pooled = this.database.GetPooledConnection())
             using (SqliteCommand command = pooled.Connection.CreateCommand())
             {
@@ -147,6 +163,7 @@ namespace GVFS.Common.Database
 
         public void AddPossibleTombstoneFolder(string path)
         {
+            using (this.timers.AddToTime())
             using (GVFSDatabase.IPooledConnection pooled = this.database.GetPooledConnection())
             using (SqliteCommand command = pooled.Connection.CreateCommand())
             {
@@ -156,6 +173,7 @@ namespace GVFS.Common.Database
 
         public void Remove(string path)
         {
+            using (this.timers.AddToTime())
             using (GVFSDatabase.IPooledConnection pooled = this.database.GetPooledConnection())
             using (SqliteCommand command = pooled.Connection.CreateCommand())
             {
@@ -206,6 +224,49 @@ namespace GVFS.Common.Database
             public bool IsExpandedFolder => this.PathType == PlaceholderType.ExpandedFolder;
 
             public bool IsPossibleTombstoneFolder => this.PathType == PlaceholderType.PossibleTombstoneFolder;
+        }
+
+        private class Stopwatches
+        {
+            private ConcurrentDictionary<string, Stopwatch> timers = new ConcurrentDictionary<string, Stopwatch>();
+
+            public IDisposable AddToTime([CallerMemberName] string name = "unknown")
+            {
+                if (!this.timers.ContainsKey(name))
+                {
+                    this.timers.TryAdd(name, new Stopwatch());
+                }
+
+                return new AutoStopwatch(this.timers[name]);
+            }
+
+            public string GetData()
+            {
+                StringBuilder sb = new StringBuilder();
+                foreach (var timer in this.timers)
+                {
+                    sb.Append($"{timer.Key}: {timer.Value.Elapsed} | ");
+                    timer.Value.Reset();
+                }
+
+                return sb.ToString();
+            }
+
+            private class AutoStopwatch : IDisposable
+            {
+                private Stopwatch stopwatch;
+
+                public AutoStopwatch(Stopwatch stopwatch)
+                {
+                    this.stopwatch = stopwatch;
+                    this.stopwatch.Start();
+                }
+
+                public void Dispose()
+                {
+                    this.stopwatch.Stop();
+                }
+            }
         }
     }
 }
