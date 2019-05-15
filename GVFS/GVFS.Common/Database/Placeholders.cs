@@ -16,7 +16,7 @@ namespace GVFS.Common.Database
 
         public static void CreateTable(SqliteCommand command)
         {
-            command.CommandText = @"CREATE TABLE IF NOT EXISTS [Placeholders] (path TEXT PRIMARY KEY, pathType TINYINT NOT NULL, sha char(40) ) WITHOUT ROWID;";
+            command.CommandText = @"CREATE TABLE IF NOT EXISTS [Placeholders] (path TEXT PRIMARY KEY COLLATE NOCASE, pathType TINYINT NOT NULL, sha char(40) ) WITHOUT ROWID;";
             command.ExecuteNonQuery();
         }
 

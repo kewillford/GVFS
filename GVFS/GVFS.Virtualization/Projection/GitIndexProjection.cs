@@ -1097,7 +1097,7 @@ namespace GVFS.Virtualization.Projection
                 numThreads = Math.Min(numThreads, placeholderFilesListCopy.Count / minItemsPerThread);
                 numThreads = Math.Max(numThreads, 1);
 
-                ConcurrentHashSet<string> folderPlaceholdersToKeep = new ConcurrentHashSet<string>();
+                ConcurrentHashSet<string> folderPlaceholdersToKeep = new ConcurrentHashSet<string>(StringComparer.OrdinalIgnoreCase);
 
                 stopwatch.Restart();
                 this.ProcessListOnThreads(
@@ -1116,12 +1116,6 @@ namespace GVFS.Virtualization.Projection
                 int deleteFolderPlaceholderAttempted = 0;
                 using (BlobSizes.BlobSizesConnection blobSizesConnection = this.blobSizes.CreateConnection())
                 {
-                    // A hash of the folder placeholders is only required if the platform expands directories
-                    HashSet<string> folderPlaceholders =
-                        GVFSPlatform.Instance.KernelDriver.EnumerationExpandsDirectories ?
-                        new HashSet<string>(placeholderFoldersListCopy.Select(x => x.Path), StringComparer.OrdinalIgnoreCase) :
-                        null;
-
                     // Order the folders in decscending order so that we walk the tree from bottom up.
                     // Traversing the folders in this order:
                     //  1. Ensures child folders are deleted before their parents
@@ -1159,7 +1153,7 @@ namespace GVFS.Virtualization.Projection
                             // properly
                             if (GVFSPlatform.Instance.KernelDriver.EnumerationExpandsDirectories && folderPlaceholder.IsExpandedFolder)
                             {
-                                this.ReExpandFolder(blobSizesConnection, folderPlaceholder.Path, folderPlaceholders);
+                                this.ReExpandFolder(blobSizesConnection, folderPlaceholder.Path);
                             }
                         }
                         else
@@ -1337,8 +1331,7 @@ namespace GVFS.Virtualization.Projection
 
         private void ReExpandFolder(
             BlobSizes.BlobSizesConnection blobSizesConnection,
-            string relativeFolderPath,
-            HashSet<string> existingFolderPlaceholders)
+            string relativeFolderPath)
         {
             FolderData folderData;
             if (!this.TryGetOrAddFolderDataFromCache(relativeFolderPath, out folderData))
@@ -1369,9 +1362,7 @@ namespace GVFS.Virtualization.Projection
                     childRelativePath = relativeFolderPath + Path.DirectorySeparatorChar + childEntry.Name.GetString();
                 }
 
-                bool newChild = childEntry.IsFolder ? !existingFolderPlaceholders.Contains(childRelativePath) : !this.placeholderDatabase.Contains(childRelativePath);
-
-                if (newChild)
+                if (!this.placeholderDatabase.Contains(childRelativePath))
                 {
                     FileSystemResult result;
                     if (childEntry.IsFolder)
@@ -1402,7 +1393,6 @@ namespace GVFS.Virtualization.Projection
                             // Git command must have removed the folder being re-expanded (relativeFolderPath)
                             // Remove the folder from existingFolderPlaceholders so that its parent will create
                             // it again (when it's re-expanded)
-                            existingFolderPlaceholders.Remove(relativeFolderPath);
                             this.placeholderDatabase.Remove(relativeFolderPath);
                             return;
 
