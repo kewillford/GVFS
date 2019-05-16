@@ -2,8 +2,7 @@
 using Microsoft.Data.Sqlite;
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Text;
+using System.Data;
 
 namespace GVFS.Common.Database
 {
@@ -60,6 +59,16 @@ namespace GVFS.Common.Database
             // Share-Cache mode allows multiple connections from the same process to share the same data cache
             // http://www.sqlite.org/sharedcache.html
             return $"data source={databasePath};Cache=Shared";
+        }
+
+        public static IDbDataParameter AddParameter(this IDbCommand command, string name, DbType dbType, object value)
+        {
+            IDbDataParameter parameter = command.CreateParameter();
+            parameter.ParameterName = name;
+            parameter.DbType = dbType;
+            parameter.Value = value;
+            command.Parameters.Add(parameter);
+            return parameter;
         }
     }
 }

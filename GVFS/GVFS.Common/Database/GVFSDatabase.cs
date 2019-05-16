@@ -3,12 +3,12 @@ using GVFS.Common.Tracing;
 using Microsoft.Data.Sqlite;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
+using System.Data;
 using System.IO;
 
 namespace GVFS.Common.Database
 {
-    public class GVFSDatabase : IDisposable
+    public class GVFSDatabase : IGVFSConnectionPool, IDisposable
     {
         private const int InitialPooledConnections = 5;
         private const int MillisecondsWaitingToGetConnection = 50;
@@ -17,12 +17,12 @@ namespace GVFS.Common.Database
         private ITracer tracer;
         private string databasePath;
         private string sqliteConnectionString;
-        private BlockingCollection<SqliteConnection> connectionPool;
+        private BlockingCollection<IDbConnection> connectionPool;
 
         public GVFSDatabase(ITracer tracer, PhysicalFileSystem fileSystem, string enlistmentRoot)
         {
             this.tracer = tracer;
-            this.connectionPool = new BlockingCollection<SqliteConnection>();
+            this.connectionPool = new BlockingCollection<IDbConnection>();
             this.databasePath = Path.Combine(enlistmentRoot, GVFSConstants.DotGVFS.Root, GVFSConstants.DotGVFS.Databases.GVFSDatabase);
             this.sqliteConnectionString = SqliteDatabase.CreateConnectionString(this.databasePath);
 
@@ -38,24 +38,19 @@ namespace GVFS.Common.Database
             this.CreateTables();
         }
 
-        public interface IPooledConnection : IDisposable
-        {
-            SqliteConnection Connection { get; }
-        }
-
         public void Dispose()
         {
             this.disposed = true;
             this.connectionPool.CompleteAdding();
-            while (!this.connectionPool.IsCompleted && this.connectionPool.TryTake(out SqliteConnection connection))
+            while (!this.connectionPool.IsCompleted && this.connectionPool.TryTake(out IDbConnection connection))
             {
                 connection.Dispose();
             }
         }
 
-        public IPooledConnection GetPooledConnection()
+        IPooledConnection IGVFSConnectionPool.GetConnection()
         {
-            SqliteConnection connection;
+            IDbConnection connection;
             if (!this.connectionPool.TryTake(out connection, millisecondsTimeout: MillisecondsWaitingToGetConnection))
             {
                 connection = this.OpenNewConnection();
@@ -64,10 +59,23 @@ namespace GVFS.Common.Database
             return new GVFSConnection(this, connection);
         }
 
+        void IGVFSConnectionPool.ReturnToPool(IDbConnection connection)
+        {
+            if (this.disposed)
+            {
+                connection?.Dispose();
+            }
+            else if (!this.connectionPool.TryAdd(connection))
+            {
+                connection?.Dispose();
+            }
+        }
+
         private void Initialize()
         {
-            using (IPooledConnection pooled = this.GetPooledConnection())
-            using (SqliteCommand command = pooled.Connection.CreateCommand())
+            IGVFSConnectionPool connectionPool = this;
+            using (IPooledConnection pooled = connectionPool.GetConnection())
+            using (IDbCommand command = pooled.Connection.CreateCommand())
             {
                 command.CommandText = $"PRAGMA journal_mode=WAL;";
                 command.ExecuteNonQuery();
@@ -87,8 +95,9 @@ namespace GVFS.Common.Database
 
         private void CreateTables()
         {
-            using (IPooledConnection pooled = this.GetPooledConnection())
-            using (SqliteCommand command = pooled.Connection.CreateCommand())
+            IGVFSConnectionPool connectionPool = this;
+            using (IPooledConnection pooled = connectionPool.GetConnection())
+            using (IDbCommand command = pooled.Connection.CreateCommand())
             {
                 Placeholders.CreateTable(command);
             }
@@ -101,30 +110,18 @@ namespace GVFS.Common.Database
             return connection;
         }
 
-        private void ReturnToPool(SqliteConnection connection)
-        {
-            if (this.disposed)
-            {
-                connection?.Dispose();
-            }
-            else if (!this.connectionPool.TryAdd(connection))
-            {
-                connection?.Dispose();
-            }
-        }
-
         private class GVFSConnection : IPooledConnection
         {
-            private SqliteConnection connection;
-            private GVFSDatabase database;
+            private IDbConnection connection;
+            private IGVFSConnectionPool database;
 
-            public GVFSConnection(GVFSDatabase database, SqliteConnection connection)
+            public GVFSConnection(IGVFSConnectionPool database, IDbConnection connection)
             {
                 this.database = database;
                 this.connection = connection;
             }
 
-            public SqliteConnection Connection => this.connection;
+            IDbConnection IPooledConnection.Connection => this.connection;
 
             public void Dispose()
             {
