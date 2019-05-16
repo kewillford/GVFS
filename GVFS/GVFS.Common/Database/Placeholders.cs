@@ -12,6 +12,8 @@ namespace GVFS.Common.Database
     {
         private GVFSDatabase database;
         private Stopwatches timers = new Stopwatches();
+        private SqliteConnection containsConnection;
+        private SqliteCommand containsCommand;
 
         public Placeholders(GVFSDatabase database)
         {
@@ -98,12 +100,18 @@ namespace GVFS.Common.Database
         public bool Contains(string path)
         {
             using (this.timers.AddToTime())
-            using (GVFSDatabase.IPooledConnection pooled = this.database.GetPooledConnection())
-            using (SqliteCommand command = pooled.Connection.CreateCommand())
             {
-                command.CommandText = $"SELECT 1 FROM Placeholders WHERE path = @path;";
-                command.Parameters.Add("@path", SqliteType.Text).Value = path;
-                object result = command.ExecuteScalar();
+                if (this.containsConnection == null)
+                {
+                    this.containsConnection = this.database.GetPooledConnection().Connection;
+                    this.containsCommand = this.containsConnection.CreateCommand();
+                    this.containsCommand.CommandText = "SELECT 1 FROM Placeholders WHERE path = @path;";
+                    this.containsCommand.Parameters.Add("@path", SqliteType.Text);
+                    this.containsCommand.Prepare();
+                }
+
+                this.containsCommand.Parameters["@path"].Value = path;
+                object result = this.containsCommand.ExecuteScalar();
                 return result != null && result != DBNull.Value;
             }
         }
