@@ -61,7 +61,7 @@ namespace GVFS.Common.Database
         {
             // Share-Cache mode allows multiple connections from the same process to share the same data cache
             // http://www.sqlite.org/sharedcache.html
-            return $"data source={databasePath};Cache=Shared";
+            return $"data source={databasePath};";
         }
 
         public IDbConnection OpenNewConnection(string databasePath)
