@@ -10,10 +10,20 @@ namespace GVFS.Common.Database
     public class PlaceholdersTable : IPlaceholderCollection
     {
         private IGVFSConnectionPool connectionPool;
+        private IDbConnection insertConnection;
+        private IDbCommand insertCommand;
+        private object insertLock = new object();
 
         public PlaceholdersTable(IGVFSConnectionPool connectionPool)
         {
             this.connectionPool = connectionPool;
+            this.insertConnection = connectionPool.GetConnection().Connection;
+            this.insertCommand = this.insertConnection.CreateCommand();
+            this.insertCommand.CommandText = "INSERT OR REPLACE INTO Placeholders (path, pathType, sha) VALUES (@path, @pathType, @sha);";
+            this.insertCommand.AddParameter("@path", DbType.String, string.Empty);
+            this.insertCommand.AddParameter("@pathType", DbType.Int32, 0);
+            this.insertCommand.AddParameter("@sha", DbType.String, string.Empty);
+            this.insertCommand.Prepare();
         }
 
         public static void CreateTable(IDbCommand command)
@@ -110,38 +120,22 @@ namespace GVFS.Common.Database
 
         public void AddFile(string path, string sha)
         {
-            using (IPooledConnection pooled = this.connectionPool.GetConnection())
-            using (IDbCommand command = pooled.Connection.CreateCommand())
-            {
-                Insert(command, new PlaceholderData() { Path = path, PathType = PlaceholderData.PlaceholderType.File, Sha = sha });
-            }
+            this.Insert(new PlaceholderData() { Path = path, PathType = PlaceholderData.PlaceholderType.File, Sha = sha });
         }
 
         public void AddPartialFolder(string path)
         {
-            using (IPooledConnection pooled = this.connectionPool.GetConnection())
-            using (IDbCommand command = pooled.Connection.CreateCommand())
-            {
-                Insert(command, new PlaceholderData() { Path = path, PathType = PlaceholderData.PlaceholderType.PartialFolder });
-            }
+            this.Insert(new PlaceholderData() { Path = path, PathType = PlaceholderData.PlaceholderType.PartialFolder });
         }
 
         public void AddExpandedFolder(string path)
         {
-            using (IPooledConnection pooled = this.connectionPool.GetConnection())
-            using (IDbCommand command = pooled.Connection.CreateCommand())
-            {
-                Insert(command, new PlaceholderData() { Path = path, PathType = PlaceholderData.PlaceholderType.ExpandedFolder });
-            }
+            this.Insert(new PlaceholderData() { Path = path, PathType = PlaceholderData.PlaceholderType.ExpandedFolder });
         }
 
         public void AddPossibleTombstoneFolder(string path)
         {
-            using (IPooledConnection pooled = this.connectionPool.GetConnection())
-            using (IDbCommand command = pooled.Connection.CreateCommand())
-            {
-                Insert(command, new PlaceholderData() { Path = path, PathType = PlaceholderData.PlaceholderType.PossibleTombstoneFolder });
-            }
+            this.Insert(new PlaceholderData() { Path = path, PathType = PlaceholderData.PlaceholderType.PossibleTombstoneFolder });
         }
 
         public void Remove(string path)
@@ -153,29 +147,42 @@ namespace GVFS.Common.Database
             }
         }
 
-        private static void Insert(IDbCommand command, PlaceholderData placeholder)
-        {
-            command.CommandText = "INSERT OR REPLACE INTO Placeholders (path, pathType, sha) VALUES (@path, @pathType, @sha);";
-            command.AddParameter("@path", DbType.String, placeholder.Path);
-            command.AddParameter("@pathType", DbType.Int32, (int)placeholder.PathType);
-
-            if (placeholder.Sha == null)
-            {
-                command.AddParameter("@sha", DbType.String, DBNull.Value);
-            }
-            else
-            {
-                command.AddParameter("@sha", DbType.String, placeholder.Sha);
-            }
-
-            command.ExecuteNonQuery();
-        }
-
         private static void Delete(IDbCommand command, string path)
         {
             command.CommandText = "DELETE FROM Placeholders WHERE path = @path;";
             command.AddParameter("@path", DbType.String, path);
             command.ExecuteNonQuery();
+        }
+
+        private void Insert(PlaceholderData placeholder)
+        {
+            ////command.CommandText = "INSERT OR REPLACE INTO Placeholders (path, pathType, sha) VALUES (@path, @pathType, @sha);";
+            ////command.AddParameter("@path", DbType.String, placeholder.Path);
+            ////command.AddParameter("@pathType", DbType.Int32, (int)placeholder.PathType);
+
+            ////if (placeholder.Sha == null)
+            ////{
+            ////    command.AddParameter("@sha", DbType.String, DBNull.Value);
+            ////}
+            ////else
+            ////{
+            ////    command.AddParameter("@sha", DbType.String, placeholder.Sha);
+            ////}
+            lock (this.insertLock)
+            {
+                ((IDbDataParameter)this.insertCommand.Parameters["@path"]).Value = placeholder.Path;
+                ((IDbDataParameter)this.insertCommand.Parameters["@pathType"]).Value = (int)placeholder.PathType;
+                if (placeholder.Sha == null)
+                {
+                    ((IDbDataParameter)this.insertCommand.Parameters["@sha"]).Value = DBNull.Value;
+                }
+                else
+                {
+                    ((IDbDataParameter)this.insertCommand.Parameters["@sha"]).Value = placeholder.Sha;
+                }
+
+                this.insertCommand.ExecuteNonQuery();
+            }
         }
 
         public class PlaceholderData : IPlaceholderData
