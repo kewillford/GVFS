@@ -25,6 +25,17 @@ namespace GVFS.Common.Database
             }
         }
 
+        public static IDbCommand PrepareInsert(IDbConnection connection)
+        {
+            IDbCommand command = connection.CreateCommand();
+            command.CommandText = "INSERT OR REPLACE INTO Placeholder (path, pathType, sha) VALUES (@path, @pathType, @sha);";
+            command.AddParameter("@path", DbType.String, string.Empty);
+            command.AddParameter("@pathType", DbType.Int32, 0);
+            command.AddParameter("@sha", DbType.String, DBNull.Value);
+            command.Prepare();
+            return command;
+        }
+
         public int GetCount()
         {
             try
@@ -174,23 +185,22 @@ namespace GVFS.Common.Database
         {
             try
             {
-                using (IDbConnection connection = this.connectionPool.GetConnection())
-                using (IDbCommand command = connection.CreateCommand())
+                using (GVFSDatabase.IGVFSConnection connection = this.connectionPool.GetConnection())
                 {
-                    command.CommandText = "INSERT OR REPLACE INTO Placeholder (path, pathType, sha) VALUES (@path, @pathType, @sha);";
-                    command.AddParameter("@path", DbType.String, placeholder.Path);
-                    command.AddParameter("@pathType", DbType.Int32, (int)placeholder.PathType);
+                    IDbCommand preparedInsert = connection.GetPreparedInsert();
+                    ((IDbDataParameter)preparedInsert.Parameters["@path"]).Value = placeholder.Path;
+                    ((IDbDataParameter)preparedInsert.Parameters["@pathType"]).Value = (int)placeholder.PathType;
 
                     if (placeholder.Sha == null)
                     {
-                        command.AddParameter("@sha", DbType.String, DBNull.Value);
+                        ((IDbDataParameter)preparedInsert.Parameters["@sha"]).Value = DBNull.Value;
                     }
                     else
                     {
-                        command.AddParameter("@sha", DbType.String, placeholder.Sha);
+                        ((IDbDataParameter)preparedInsert.Parameters["@sha"]).Value = placeholder.Sha;
                     }
 
-                    command.ExecuteNonQuery();
+                    preparedInsert.ExecuteNonQuery();
                 }
             }
             catch (Exception ex)
