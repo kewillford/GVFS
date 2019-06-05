@@ -643,22 +643,6 @@ namespace GVFS.CommandLine
                 RepoMetadata.Shutdown();
             }
 
-            // Prepare the working directory folder for GVFS last to ensure that gvfs mount will fail if gvfs clone has failed
-            Exception exception;
-            string prepFileSystemError;
-            if (!GVFSPlatform.Instance.KernelDriver.TryPrepareFolderForCallbacks(enlistment.WorkingDirectoryBackingRoot, out prepFileSystemError, out exception))
-            {
-                EventMetadata metadata = new EventMetadata();
-                metadata.Add(nameof(prepFileSystemError), prepFileSystemError);
-                if (exception != null)
-                {
-                    metadata.Add("Exception", exception.ToString());
-                }
-
-                tracer.RelatedError(metadata, $"{nameof(this.CreateClone)}: TryPrepareFolderForCallbacks failed");
-                return new Result(prepFileSystemError);
-            }
-
             return new Result(true);
         }
 
