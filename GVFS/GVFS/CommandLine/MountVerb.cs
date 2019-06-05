@@ -112,25 +112,6 @@ namespace GVFS.CommandLine
                         { nameof(this.EnlistmentRootPathParameter), this.EnlistmentRootPathParameter },
                     });
 
-                if (!GVFSPlatform.Instance.KernelDriver.IsReady(tracer, enlistment.EnlistmentRoot, this.Output, out errorMessage))
-                {
-                    tracer.RelatedEvent(
-                        EventLevel.Informational,
-                        $"{nameof(MountVerb)}_{nameof(this.Execute)}_EnablingKernelDriverViaService",
-                        new EventMetadata
-                        {
-                            { "KernelDriver.IsReady_Error", errorMessage },
-                            { TracingConstants.MessageKey.InfoMessage, "Service will retry" }
-                        });
-
-                    if (!this.ShowStatusWhileRunning(
-                        () => { return this.TryEnableAndAttachPrjFltThroughService(enlistment.EnlistmentRoot, out errorMessage); },
-                        $"Attaching ProjFS to volume"))
-                    {
-                        this.ReportErrorAndExit(tracer, ReturnCode.FilterError, errorMessage);
-                    }
-                }
-
                 RetryConfig retryConfig = null;
                 ServerGVFSConfig serverGVFSConfig = this.DownloadedGVFSConfig;
                 if (!this.SkipVersionCheck)

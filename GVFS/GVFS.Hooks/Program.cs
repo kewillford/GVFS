@@ -1,20 +1,14 @@
 using GVFS.Common;
-using GVFS.Common.Git;
 using GVFS.Common.NamedPipes;
 using GVFS.Hooks.HooksPlatform;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Security;
 
 namespace GVFS.Hooks
 {
     public class Program
     {
-        private const string PreCommandHook = "pre-command";
-        private const string PostCommandHook = "post-command";
-
         private const string GitPidArg = "--git-pid=";
         private const int InvalidProcessId = -1;
 
@@ -54,69 +48,11 @@ namespace GVFS.Hooks
 
                 enlistmentPipename = GVFSHooksPlatform.GetNamedPipeName(enlistmentRoot);
 
-                switch (GetHookType(args))
-                {
-                    case PreCommandHook:
-                        CheckForLegalCommands(args);
-                        RunLockRequest(args, unattended, AcquireGVFSLockForProcess);
-                        RunPreCommands(args);
-                        break;
-
-                    case PostCommandHook:
-                        // Do not release the lock if this request was only run to see if it could acquire the GVFSLock,
-                        // but did not actually acquire it.
-                        if (!CheckGVFSLockAvailabilityOnly(args))
-                        {
-                            RunLockRequest(args, unattended, ReleaseGVFSLock);
-                        }
-
-                        RunPostCommands(args, unattended);
-                        break;
-
-                    default:
-                        ExitWithError("Unrecognized hook: " + string.Join(" ", args));
-                        break;
-                }
+                ExitWithError("Unrecognized hook: " + string.Join(" ", args));
             }
             catch (Exception ex)
             {
                 ExitWithError("Unexpected exception: " + ex.ToString());
-            }
-        }
-
-        private static void RunPreCommands(string[] args)
-        {
-            string command = GetGitCommand(args);
-            switch (command)
-            {
-                case "fetch":
-                case "pull":
-                    ProcessHelper.Run("gvfs", "prefetch --commits", redirectOutput: false);
-                    break;
-            }
-        }
-
-        private static void RunPostCommands(string[] args, bool unattended)
-        {
-            if (!unattended)
-            {
-                RemindUpgradeAvailable();
-            }
-        }
-
-        private static void RemindUpgradeAvailable()
-        {
-            // The idea is to generate a random number between 0 and 100. To make
-            // sure that the reminder is displayed only 10% of the times a git
-            // command is run, check that the random number is between 0 and 10,
-            // which will have a probability of 10/100 == 10%.
-            int reminderFrequency = 10;
-            int randomValue = random.Next(0, 100);
-
-            if (randomValue <= reminderFrequency &&
-                ProductUpgraderInfo.IsLocalUpgradeAvailable(tracer: null, gvfsDataRoot: GVFSHooksPlatform.GetDataRootForGVFS()))
-            {
-                Console.WriteLine(Environment.NewLine + GVFSConstants.UpgradeVerbMessages.ReminderNotification);
             }
         }
 
@@ -128,82 +64,6 @@ namespace GVFS.Hooks
             }
 
             Environment.Exit(1);
-        }
-
-        private static void CheckForLegalCommands(string[] args)
-        {
-            string command = GetGitCommand(args);
-            switch (command)
-            {
-                case "status":
-                    VerifyRenameDetectionSettings(args);
-                    break;
-
-                case "gui":
-                    ExitWithError("To access the 'git gui' in a GVFS repo, please invoke 'git-gui.exe' instead.");
-                    break;
-            }
-        }
-
-        private static void VerifyRenameDetectionSettings(string[] args)
-        {
-            string srcRoot = Path.Combine(enlistmentRoot, GVFSConstants.WorkingDirectoryRootName);
-            if (File.Exists(Path.Combine(srcRoot, GVFSConstants.DotGit.MergeHead)) ||
-                File.Exists(Path.Combine(srcRoot, GVFSConstants.DotGit.RevertHead)))
-            {
-                // If no-renames is specified, avoid reading config.
-                if (!args.Contains("--no-renames"))
-                {
-                    // To behave properly, this needs to check for the status.renames setting the same
-                    // way that git does including global and local config files, setting inheritance from
-                    // diff.renames, etc.  This is probably best accomplished by calling "git config --get status.renames"
-                    // to ensure we are getting the correct value and then checking for "true" (rather than
-                    // just existance like below).
-                    Dictionary<string, GitConfigSetting> statusConfig = GitConfigHelper.GetSettings(
-                        File.ReadAllLines(Path.Combine(srcRoot, GVFSConstants.DotGit.Config)),
-                        "test");
-
-                    if (!statusConfig.ContainsKey("renames"))
-                    {
-                        ExitWithError(
-                            "git status requires rename detection to be disabled during a merge or revert conflict.",
-                            "Run 'git status --no-renames'");
-                    }
-                }
-            }
-        }
-
-        private static void RunLockRequest(string[] args, bool unattended, LockRequestDelegate requestToRun)
-        {
-            try
-            {
-                if (ShouldLock(args))
-                {
-                    using (NamedPipeClient pipeClient = new NamedPipeClient(enlistmentPipename))
-                    {
-                        if (!pipeClient.Connect())
-                        {
-                            ExitWithError("The repo does not appear to be mounted. Use 'gvfs status' to check.");
-                        }
-
-                        int pid = GetParentPid(args);
-                        if (pid == Program.InvalidProcessId ||
-                            !GVFSHooksPlatform.IsProcessActive(pid))
-                        {
-                            ExitWithError("GVFS.Hooks: Unable to find parent git.exe process " + "(PID: " + pid + ").");
-                        }
-
-                        requestToRun(unattended, args, pid, pipeClient);
-                    }
-                }
-            }
-            catch (Exception exc)
-            {
-                ExitWithError(
-                    "Unable to initialize Git command.",
-                    "Ensure that GVFS is running.",
-                    exc.ToString());
-            }
         }
 
         private static string GenerateFullCommand(string[] args)
@@ -357,17 +217,17 @@ namespace GVFS.Hooks
 
         private static bool IsGitEnvVarDisabled(string envVar)
         {
-                string envVarValue = Environment.GetEnvironmentVariable(envVar);
-                if (!string.IsNullOrEmpty(envVarValue))
+            string envVarValue = Environment.GetEnvironmentVariable(envVar);
+            if (!string.IsNullOrEmpty(envVarValue))
+            {
+                if (string.Equals(envVarValue, "false", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(envVarValue, "no", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(envVarValue, "off", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(envVarValue, "0", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (string.Equals(envVarValue, "false", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(envVarValue, "no", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(envVarValue, "off", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(envVarValue, "0", StringComparison.OrdinalIgnoreCase))
-                    {
-                        return true;
-                    }
+                    return true;
                 }
+            }
 
             return false;
         }

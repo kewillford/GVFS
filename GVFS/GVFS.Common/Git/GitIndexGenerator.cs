@@ -42,16 +42,18 @@ namespace GVFS.Common.Git
         private Enlistment enlistment;
         private ITracer tracer;
         private bool shouldHashIndex;
+        private bool fullySparse;
 
         private uint entryCount = 0;
 
         private BlockingCollection<LsTreeEntry> entryQueue = new BlockingCollection<LsTreeEntry>();
 
-        public GitIndexGenerator(ITracer tracer, Enlistment enlistment, bool shouldHashIndex)
+        public GitIndexGenerator(ITracer tracer, Enlistment enlistment, bool shouldHashIndex, bool fullySparse = false)
         {
             this.tracer = tracer;
             this.enlistment = enlistment;
             this.shouldHashIndex = shouldHashIndex;
+            this.fullySparse = fullySparse;
 
             this.indexLockPath = Path.Combine(enlistment.DotGitRoot, GVFSConstants.DotGit.IndexName + GVFSConstants.DotGit.LockExtension);
         }
@@ -150,7 +152,13 @@ namespace GVFS.Common.Git
             byte[] filenameBytes = Encoding.UTF8.GetBytes(filename);
 
             ushort flags = (ushort)(filenameBytes.Length & 0xFFF);
+            flags |= version >= 3 && this.fullySparse ? ExtendedBit : (ushort)0;
             writer.Write(EndianHelper.Swap(flags));
+
+            if (version >= 3 && this.fullySparse)
+            {
+                writer.Write(EndianHelper.Swap(SkipWorktreeBit));
+            }
 
             if (version >= 4)
             {

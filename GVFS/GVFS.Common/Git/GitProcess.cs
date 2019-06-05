@@ -610,7 +610,7 @@ namespace GVFS.Common.Git
 
         public Result ResetHeadToSparseCheckout()
         {
-            return this.InvokeGitAgainstDotGitFolder("read-tree -m -u HEAD");
+            return this.InvokeGitInWorkingDirectoryRoot("read-tree -m -u HEAD", useReadObjectHook: true);
         }
 
         public Result PrunePacked(string gitObjectDirectory)

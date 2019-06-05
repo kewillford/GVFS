@@ -1,5 +1,4 @@
 ﻿using GVFS.Common;
-using GVFS.Common.Database;
 using GVFS.Common.FileSystem;
 using GVFS.Common.Git;
 using GVFS.Common.Http;
@@ -19,7 +18,6 @@ namespace GVFS.Mount
     {
         private readonly bool showDebugWindow;
 
-        private GVFSDatabase gvfsDatabase;
         private GVFSEnlistment enlistment;
         private ITracer tracer;
         private GitMaintenanceScheduler maintenanceScheduler;
@@ -137,15 +135,6 @@ namespace GVFS.Mount
                     Keywords.Telemetry);
 
                 this.currentState = MountState.Ready;
-
-                Debugger.Launch();
-                GitProcess.Result result = this.enlistment.CreateGitProcess().ResetHeadToSparseCheckout();
-
-                if (result.ExitCodeIsFailure)
-                {
-                    this.tracer.RelatedWarning($"Failed to reset sparse-checkout with error: {result.Errors}");
-                }
-
                 this.unmountEvent.WaitOne();
             }
         }
@@ -485,7 +474,6 @@ namespace GVFS.Mount
                 this.tracer.RelatedInfo("Git status cache is not enabled");
             }
 
-            this.gvfsDatabase = this.CreateOrReportAndExit(() => new GVFSDatabase(this.context.FileSystem, this.context.Enlistment.EnlistmentRoot, new SqliteDatabase()), "Failed to create database connection");
             this.maintenanceScheduler = this.CreateOrReportAndExit(() => new GitMaintenanceScheduler(this.context, this.gitObjects), "Failed to start maintenance scheduler");
 
             int majorVersion;
@@ -511,9 +499,6 @@ namespace GVFS.Mount
                 this.maintenanceScheduler.Dispose();
                 this.maintenanceScheduler = null;
             }
-
-            this.gvfsDatabase?.Dispose();
-            this.gvfsDatabase = null;
         }
     }
 }
