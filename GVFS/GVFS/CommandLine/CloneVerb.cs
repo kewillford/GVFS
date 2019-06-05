@@ -6,6 +6,7 @@ using GVFS.Common.Http;
 using GVFS.Common.NamedPipes;
 using GVFS.Common.Tracing;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -577,6 +578,12 @@ namespace GVFS.CommandLine
                 return new Result(installHooksError);
             }
 
+            GitProcess.Result resetResult = git.ResetHeadToSparseCheckout();
+            if (resetResult.ExitCodeIsFailure)
+            {
+                    tracer.RelatedError(resetResult.Errors);
+            }
+
             GitProcess.Result forceCheckoutResult = git.ForceCheckout(branch);
             if (forceCheckoutResult.ExitCodeIsFailure && forceCheckoutResult.Errors.IndexOf("unable to read tree") > 0)
             {
@@ -693,6 +700,9 @@ git %*
             File.WriteAllText(
                 Path.Combine(repoPath, GVFSConstants.DotGit.PackedRefs),
                 refs.ToPackedRefs());
+
+            // Initialize sparse-checkout
+            File.WriteAllText(Path.Combine(repoPath, GVFSConstants.DotGit.Info.SparseCheckoutPath), "/.gitattributes\n/.gitignore");
 
             return new Result(true);
         }

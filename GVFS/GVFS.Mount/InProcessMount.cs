@@ -138,6 +138,14 @@ namespace GVFS.Mount
 
                 this.currentState = MountState.Ready;
 
+                Debugger.Launch();
+                GitProcess.Result result = this.enlistment.CreateGitProcess().ResetHeadToSparseCheckout();
+
+                if (result.ExitCodeIsFailure)
+                {
+                    this.tracer.RelatedWarning($"Failed to reset sparse-checkout with error: {result.Errors}");
+                }
+
                 this.unmountEvent.WaitOne();
             }
         }

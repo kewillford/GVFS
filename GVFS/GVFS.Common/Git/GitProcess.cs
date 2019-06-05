@@ -608,6 +608,11 @@ namespace GVFS.Common.Git
             return this.InvokeGitAgainstDotGitFolder("read-tree " + treeIsh);
         }
 
+        public Result ResetHeadToSparseCheckout()
+        {
+            return this.InvokeGitAgainstDotGitFolder("read-tree -m -u HEAD");
+        }
+
         public Result PrunePacked(string gitObjectDirectory)
         {
             return this.InvokeGitAgainstDotGitFolder(
@@ -674,11 +679,6 @@ namespace GVFS.Common.Git
             if (gitObjectsDirectory != null)
             {
                 processInfo.EnvironmentVariables["GIT_OBJECT_DIRECTORY"] = gitObjectsDirectory;
-            }
-
-            if (!useReadObjectHook)
-            {
-                command = "-c " + GitConfigSetting.CoreVirtualizeObjectsName + "=false " + command;
             }
 
             if (!string.IsNullOrEmpty(dotGitDirectory))

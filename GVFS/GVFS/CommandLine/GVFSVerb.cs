@@ -134,7 +134,6 @@ namespace GVFS.CommandLine
                 { "core.bare", "false" },
                 { "core.logallrefupdates", "true" },
                 { GitConfigSetting.CoreVirtualizeObjectsName, "true" },
-                { GitConfigSetting.CoreVirtualFileSystemName, Paths.ConvertPathToGitFormat(GVFSConstants.DotGit.Hooks.VirtualFileSystemPath) },
                 { "core.hookspath", expectedHooksPath },
                 { GitConfigSetting.CredentialUseHttpPath, "true" },
                 { "credential.validate", "false" },

@@ -1,6 +1,4 @@
 ﻿using GVFS.Common;
-using GVFS.Common.FileSystem;
-using GVFS.Common.Git;
 using System;
 using System.IO;
 
@@ -22,9 +20,8 @@ namespace GVFS.Platform.Windows
             try
             {
                 string configSetting = GVFSConstants.GitConfig.HooksPrefix + hookName;
-                string mergedHooks = MergeHooks(context, configSetting, hookName);
 
-                string contents = string.Format(HooksConfigContentTemplate, configSetting, mergedHooks);
+                string contents = string.Format(HooksConfigContentTemplate, configSetting, string.Empty);
                 Exception ex;
                 if (!context.FileSystem.TryWriteTempFileAndRename(targetPath, contents, out ex))
                 {
@@ -35,21 +32,6 @@ namespace GVFS.Platform.Windows
             {
                 throw new RetryableException("Error installing " + targetPath, io);
             }
-        }
-
-        private static string MergeHooks(GVFSContext context, string configSettingName, string hookName)
-        {
-            GitProcess configProcess = new GitProcess(context.Enlistment);
-            string filename;
-            string[] defaultHooksLines = { };
-
-            if (configProcess.TryGetFromConfig(configSettingName, forceOutsideEnlistment: true, value: out filename) && filename != null)
-            {
-                filename = filename.Trim(' ', '\n');
-                defaultHooksLines = File.ReadAllLines(filename);
-            }
-
-            return HooksInstaller.MergeHooksData(defaultHooksLines, filename, hookName);
         }
     }
 }
