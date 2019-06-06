@@ -100,6 +100,11 @@ namespace GVFS.CommandLine
             get { return PrefetchVerbName; }
         }
 
+        public void ExecuteSideBySide(GVFSEnlistment enlistment)
+        {
+            this.Execute(enlistment);
+        }
+
         protected override void Execute(GVFSEnlistment enlistment)
         {
             using (JsonTracer tracer = new JsonTracer(GVFSConstants.GVFSEtwProviderName, "Prefetch"))

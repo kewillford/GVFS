@@ -111,6 +111,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CommandLine\AddVerb.cs" />
     <Compile Include="CommandLine\CacheServerVerb.cs" />
     <Compile Include="CommandLine\CloneVerb.cs" />
     <Compile Include="CommandLine\ConfigVerb.cs" />

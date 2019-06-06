@@ -87,6 +87,7 @@ namespace GVFS.Common
             public const string MountPrefix = "mount";
             public const string UpgradePrefix = "productupgrade";
 
+            public const string Add = "add";
             public const string Clone = "clone";
             public const string Dehydrate = "dehydrate";
             public const string MountVerb = MountPrefix + "_verb";

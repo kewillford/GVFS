@@ -16,6 +16,7 @@ namespace GVFS
 
             Type[] verbTypes = new Type[]
             {
+                typeof(AddVerb),
                 typeof(CacheServerVerb),
                 typeof(CloneVerb),
                 typeof(ConfigVerb),
