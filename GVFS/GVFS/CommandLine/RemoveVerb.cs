@@ -110,12 +110,6 @@ namespace GVFS.CommandLine
             using (FileStream outStream = File.OpenWrite(sparseCheckoutPath))
             using (StreamWriter writer = new StreamWriter(outStream))
             {
-                // First line: Add everything
-                writer.Write("/*\n");
-
-                // Second line: Don't add anything inside folders
-                writer.Write("!/*/*\n");
-
                 foreach (string line in sparseCheckout)
                 {
                     writer.Write(line + "\n");
@@ -128,7 +122,13 @@ namespace GVFS.CommandLine
         private bool ResetIndex()
         {
             GitProcess git = new GitProcess(this.enlistment);
-            git.ResetHeadToSparseCheckout();
+            GitProcess.Result result = git.ResetHeadToSparseCheckout();
+
+            if (result.ExitCodeIsFailure)
+            {
+                this.tracer.RelatedError($"Failed to reset index to HEAD: %s", result.Errors);
+            }
+
             return true;
         }
 

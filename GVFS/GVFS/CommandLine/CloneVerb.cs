@@ -580,7 +580,7 @@ namespace GVFS.CommandLine
             }
 
             // Initialize sparse-checkout
-            File.WriteAllText(Path.Combine(enlistment.WorkingDirectoryBackingRoot, GVFSConstants.DotGit.Info.SparseCheckoutPath), "/*\n!/*/*\n");
+            File.WriteAllText(Path.Combine(enlistment.WorkingDirectoryBackingRoot, GVFSConstants.DotGit.Info.SparseCheckoutPath), "/.gitattributes\n");
             git.ResetHeadToSparseCheckout();
 
             GitProcess.Result forceCheckoutResult = git.ForceCheckout(branch);

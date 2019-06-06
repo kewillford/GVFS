@@ -51,15 +51,15 @@ namespace GVFS.CommandLine
                     enlistment.RepoUrl,
                     this.cacheServerUrl);
 
+                this.PrefetchBlobs();
+
                 if (!this.Verbose)
                 {
                     this.UpdateSparseCheckout();
-                    this.PrefetchBlobs();
                     this.ResetIndex();
                 }
                 else
                 {
-                    this.ShowStatusWhileRunning(this.PrefetchBlobs, "Prefetching necessary blobs");
                     this.ShowStatusWhileRunning(this.UpdateSparseCheckout, "Updating sparse-checkout file");
                     this.ShowStatusWhileRunning(this.ResetIndex, "Resetting index and populating the working directory");
                 }
@@ -93,12 +93,6 @@ namespace GVFS.CommandLine
             }
 
             List<string> finalLines = new List<string>();
-
-            // First line: Add everything
-            finalLines.Add("/*");
-
-            // Second line: Don't add anything inside folders
-            finalLines.Add("!/*/*");
 
             // The rest: Add the folders we care about!
             foreach (string folder in sparseCheckout)
@@ -145,7 +139,14 @@ namespace GVFS.CommandLine
         private bool ResetIndex()
         {
             GitProcess git = new GitProcess(this.enlistment);
-            git.ResetHeadToSparseCheckout();
+            GitProcess.Result result = git.ResetHeadToSparseCheckout();
+
+            if (result.ExitCodeIsFailure)
+            {
+                this.tracer.RelatedError($"Failed to reset index to HEAD: %s", result.Errors);
+                return false;
+            }
+
             return true;
         }
     }
