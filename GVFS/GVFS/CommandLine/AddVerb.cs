@@ -6,6 +6,7 @@ using GVFS.Common.Tracing;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace GVFS.CommandLine
 {
@@ -124,14 +125,33 @@ namespace GVFS.CommandLine
 
         private bool PrefetchBlobs()
         {
-            PrefetchVerb prefetchVerb = new PrefetchVerb();
-            prefetchVerb.Folders = this.Folders;
-            prefetchVerb.Files = string.Empty;
-            prefetchVerb.FoldersListFile = string.Empty;
-            prefetchVerb.FilesListFile = string.Empty;
-            prefetchVerb.Verbose = false;
+            GitProcess gitProcess = new GitProcess(this.enlistment);
+            GitProcess.Result result = gitProcess.RevParse(GVFSConstants.DotGit.HeadName);
+            if (result.ExitCodeIsFailure)
+            {
+                this.ReportErrorAndExit(this.tracer, result.Errors);
+            }
 
-            prefetchVerb.ExecuteSideBySide(this.enlistment);
+            string headCommitId = result.Output.Trim();
+
+            this.InitializeServerConnection(
+                this.tracer,
+                this.enlistment,
+                this.cacheServerUrl,
+                out GitObjectsHttpRequestor objectRequestor,
+                out CacheServerInfo cacheServer);
+
+            this.PrefetchBlobs(
+                this.tracer,
+                this.enlistment,
+                headCommitId,
+                filesList: null,
+                foldersList: this.Folders.Split(';').ToList(),
+                lastPrefetchArgs: null,
+                objectRequestor: objectRequestor,
+                cacheServer: cacheServer,
+                verbose: this.Verbose,
+                hydrateFiles: false);
 
             return true;
         }

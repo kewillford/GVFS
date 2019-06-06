@@ -17,16 +17,6 @@ namespace GVFS.CommandLine
     {
         private const string PrefetchVerbName = "prefetch";
 
-        private const int LockWaitTimeMs = 100;
-        private const int WaitingOnLockLogThreshold = 50;
-        private const int IoFailureRetryDelayMS = 50;
-        private const string PrefetchCommitsAndTreesLock = "prefetch-commits-trees.lock";
-
-        private const int ChunkSize = 4000;
-        private static readonly int SearchThreadCount = Environment.ProcessorCount;
-        private static readonly int DownloadThreadCount = Environment.ProcessorCount;
-        private static readonly int IndexThreadCount = Environment.ProcessorCount;
-
         [Option(
             "files",
             Required = false,
@@ -90,10 +80,6 @@ namespace GVFS.CommandLine
             Default = false,
             HelpText = "Show all outputs on the console in addition to writing them to a log file.")]
         public bool Verbose { get; set; }
-
-        public bool SkipVersionCheck { get; set; }
-        public CacheServerInfo ResolvedCacheServer { get; set; }
-        public ServerGVFSConfig ServerGVFSConfig { get; set; }
 
         protected override string VerbName
         {
@@ -188,7 +174,16 @@ namespace GVFS.CommandLine
                                 cacheServerUrl,
                                 out objectRequestor,
                                 out cacheServer);
-                            this.PrefetchBlobs(tracer, enlistment, headCommitId, filesList, foldersList, lastPrefetchArgs, objectRequestor, cacheServer);
+
+                            if (this.HydrateFiles)
+                            {
+                                if (!this.CheckIsMounted(verbose: true))
+                                {
+                                    this.ReportErrorAndExit("You can only specify --hydrate if the repo is mounted. Run 'gvfs mount' and try again.");
+                                }
+                            }
+
+                            this.PrefetchBlobs(tracer, enlistment, headCommitId, filesList, foldersList, lastPrefetchArgs, objectRequestor, cacheServer, this.Verbose, this.HydrateFiles);
                         }
                     }
                 }
@@ -230,45 +225,6 @@ namespace GVFS.CommandLine
                     Environment.ExitCode = (int)ReturnCode.GenericError;
                 }
             }
-        }
-
-        private void InitializeServerConnection(
-            ITracer tracer,
-            GVFSEnlistment enlistment,
-            string cacheServerUrl,
-            out GitObjectsHttpRequestor objectRequestor,
-            out CacheServerInfo cacheServer)
-        {
-            RetryConfig retryConfig = this.GetRetryConfig(tracer, enlistment, TimeSpan.FromMinutes(RetryConfig.FetchAndCloneTimeoutMinutes));
-
-            cacheServer = this.ResolvedCacheServer;
-            ServerGVFSConfig serverGVFSConfig = this.ServerGVFSConfig;
-            if (!this.SkipVersionCheck)
-            {
-                string authErrorMessage;
-                if (!this.TryAuthenticate(tracer, enlistment, out authErrorMessage))
-                {
-                    this.ReportErrorAndExit(tracer, "Unable to prefetch because authentication failed: " + authErrorMessage);
-                }
-
-                if (serverGVFSConfig == null)
-                {
-                    serverGVFSConfig = this.QueryGVFSConfig(tracer, enlistment, retryConfig);
-                }
-
-                if (cacheServer == null)
-                {
-                    CacheServerResolver cacheServerResolver = new CacheServerResolver(tracer, enlistment);
-                    cacheServer = cacheServerResolver.ResolveNameFromRemote(cacheServerUrl, serverGVFSConfig);
-                }
-
-                this.ValidateClientVersions(tracer, enlistment, serverGVFSConfig, showWarnings: false);
-
-                this.Output.WriteLine("Configured cache server: " + cacheServer);
-            }
-
-            this.InitializeLocalCacheAndObjectsPaths(tracer, enlistment, retryConfig, serverGVFSConfig, cacheServer);
-            objectRequestor = new GitObjectsHttpRequestor(tracer, enlistment, cacheServer, retryConfig);
         }
 
         private void PrefetchCommits(ITracer tracer, GVFSEnlistment enlistment, GitObjectsHttpRequestor objectRequestor, CacheServerInfo cacheServer)
@@ -340,98 +296,6 @@ namespace GVFS.CommandLine
             headCommitId = result.Output.Trim();
         }
 
-        private void PrefetchBlobs(
-            ITracer tracer,
-            GVFSEnlistment enlistment,
-            string headCommitId,
-            List<string> filesList,
-            List<string> foldersList,
-            FileBasedDictionary<string, string> lastPrefetchArgs,
-            GitObjectsHttpRequestor objectRequestor,
-            CacheServerInfo cacheServer)
-        {
-            BlobPrefetcher blobPrefetcher = new BlobPrefetcher(
-                tracer,
-                enlistment,
-                objectRequestor,
-                filesList,
-                foldersList,
-                lastPrefetchArgs,
-                ChunkSize,
-                SearchThreadCount,
-                DownloadThreadCount,
-                IndexThreadCount);
-
-            if (blobPrefetcher.FolderList.Count == 0 &&
-                blobPrefetcher.FileList.Count == 0)
-            {
-                this.ReportErrorAndExit(tracer, "Did you mean to fetch all blobs? If so, specify `--files '*'` to confirm.");
-            }
-
-            if (this.HydrateFiles)
-            {
-                if (!this.CheckIsMounted(verbose: true))
-                {
-                    this.ReportErrorAndExit("You can only specify --hydrate if the repo is mounted. Run 'gvfs mount' and try again.");
-                }
-            }
-
-            int matchedBlobCount = 0;
-            int downloadedBlobCount = 0;
-            int hydratedFileCount = 0;
-
-            Func<bool> doPrefetch =
-                () =>
-                {
-                    try
-                    {
-                        blobPrefetcher.PrefetchWithStats(
-                            headCommitId,
-                            isBranch: false,
-                            hydrateFilesAfterDownload: this.HydrateFiles,
-                            matchedBlobCount: out matchedBlobCount,
-                            downloadedBlobCount: out downloadedBlobCount,
-                            hydratedFileCount: out hydratedFileCount);
-                        return !blobPrefetcher.HasFailures;
-                    }
-                    catch (BlobPrefetcher.FetchException e)
-                    {
-                        tracer.RelatedError(e.Message);
-                        return false;
-                    }
-                };
-
-            if (this.Verbose)
-            {
-                doPrefetch();
-            }
-            else
-            {
-                string message =
-                    this.HydrateFiles
-                    ? "Fetching blobs and hydrating files "
-                    : "Fetching blobs ";
-                this.ShowStatusWhileRunning(doPrefetch, message + this.GetCacheServerDisplay(cacheServer, enlistment.RepoUrl));
-            }
-
-            if (blobPrefetcher.HasFailures)
-            {
-                Environment.ExitCode = 1;
-            }
-            else
-            {
-                Console.WriteLine();
-                Console.WriteLine("Stats:");
-                Console.WriteLine("  Matched blobs:    " + matchedBlobCount);
-                Console.WriteLine("  Already cached:   " + (matchedBlobCount - downloadedBlobCount));
-                Console.WriteLine("  Downloaded:       " + downloadedBlobCount);
-                if (this.HydrateFiles)
-                {
-                    Console.WriteLine("  Hydrated files:   " + hydratedFileCount);
-                }
-            }
-        }
-
         private bool CheckIsMounted(bool verbose)
         {
             Func<bool> checkMount = () => this.Execute<StatusVerb>(
@@ -451,16 +315,6 @@ namespace GVFS.CommandLine
             {
                 return checkMount();
             }
-        }
-
-        private string GetCacheServerDisplay(CacheServerInfo cacheServer, string repoUrl)
-        {
-            if (!cacheServer.IsNone(repoUrl))
-            {
-                return "from cache server";
-            }
-
-            return "from origin (no cache server)";
         }
     }
 }

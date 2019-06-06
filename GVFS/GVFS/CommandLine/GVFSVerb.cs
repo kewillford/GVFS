@@ -4,6 +4,7 @@ using GVFS.Common.FileSystem;
 using GVFS.Common.Git;
 using GVFS.Common.Http;
 using GVFS.Common.NamedPipes;
+using GVFS.Common.Prefetch;
 using GVFS.Common.Tracing;
 using Newtonsoft.Json;
 using System;
@@ -819,9 +820,23 @@ You can specify a URL, a name of a configured cache server, or the special names
 
         public abstract class ForExistingEnlistment : GVFSVerb
         {
+            private const int LockWaitTimeMs = 100;
+            private const int WaitingOnLockLogThreshold = 50;
+            private const int IoFailureRetryDelayMS = 50;
+            private const string PrefetchCommitsAndTreesLock = "prefetch-commits-trees.lock";
+
+            private const int ChunkSize = 4000;
+            private static readonly int SearchThreadCount = Environment.ProcessorCount;
+            private static readonly int DownloadThreadCount = Environment.ProcessorCount;
+            private static readonly int IndexThreadCount = Environment.ProcessorCount;
+
             public ForExistingEnlistment(bool validateOrigin = true) : base(validateOrigin)
             {
             }
+
+            public CacheServerInfo ResolvedCacheServer { get; set; }
+            public ServerGVFSConfig ServerGVFSConfig { get; set; }
+            public bool SkipVersionCheck { get; set; }
 
             [Value(
                 0,
@@ -874,6 +889,141 @@ You can specify a URL, a name of a configured cache server, or the special names
                 }
 
                 RepoMetadata.Shutdown();
+            }
+
+            protected void InitializeServerConnection(
+                ITracer tracer,
+                GVFSEnlistment enlistment,
+                string cacheServerUrl,
+                out GitObjectsHttpRequestor objectRequestor,
+                out CacheServerInfo cacheServer)
+            {
+                RetryConfig retryConfig = this.GetRetryConfig(tracer, enlistment, TimeSpan.FromMinutes(RetryConfig.FetchAndCloneTimeoutMinutes));
+
+                cacheServer = this.ResolvedCacheServer;
+                ServerGVFSConfig serverGVFSConfig = this.ServerGVFSConfig;
+                if (!this.SkipVersionCheck)
+                {
+                    string authErrorMessage;
+                    if (!this.TryAuthenticate(tracer, enlistment, out authErrorMessage))
+                    {
+                        this.ReportErrorAndExit(tracer, "Unable to prefetch because authentication failed: " + authErrorMessage);
+                    }
+
+                    if (serverGVFSConfig == null)
+                    {
+                        serverGVFSConfig = this.QueryGVFSConfig(tracer, enlistment, retryConfig);
+                    }
+
+                    if (cacheServer == null)
+                    {
+                        CacheServerResolver cacheServerResolver = new CacheServerResolver(tracer, enlistment);
+                        cacheServer = cacheServerResolver.ResolveNameFromRemote(cacheServerUrl, serverGVFSConfig);
+                    }
+
+                    this.ValidateClientVersions(tracer, enlistment, serverGVFSConfig, showWarnings: false);
+
+                    this.Output.WriteLine("Configured cache server: " + cacheServer);
+                }
+
+                this.InitializeLocalCacheAndObjectsPaths(tracer, enlistment, retryConfig, serverGVFSConfig, cacheServer);
+                objectRequestor = new GitObjectsHttpRequestor(tracer, enlistment, cacheServer, retryConfig);
+            }
+
+            protected void PrefetchBlobs(
+                ITracer tracer,
+                GVFSEnlistment enlistment,
+                string headCommitId,
+                List<string> filesList,
+                List<string> foldersList,
+                FileBasedDictionary<string, string> lastPrefetchArgs,
+                GitObjectsHttpRequestor objectRequestor,
+                CacheServerInfo cacheServer,
+                bool verbose,
+                bool hydrateFiles)
+            {
+                BlobPrefetcher blobPrefetcher = new BlobPrefetcher(
+                    tracer,
+                    enlistment,
+                    objectRequestor,
+                    filesList,
+                    foldersList,
+                    lastPrefetchArgs,
+                    ChunkSize,
+                    SearchThreadCount,
+                    DownloadThreadCount,
+                    IndexThreadCount);
+
+                if (blobPrefetcher.FolderList.Count == 0 &&
+                    blobPrefetcher.FileList.Count == 0)
+                {
+                    this.ReportErrorAndExit(tracer, "Did you mean to fetch all blobs? If so, specify `--files '*'` to confirm.");
+                }
+
+                int matchedBlobCount = 0;
+                int downloadedBlobCount = 0;
+                int hydratedFileCount = 0;
+
+                Func<bool> doPrefetch =
+                    () =>
+                    {
+                        try
+                        {
+                            blobPrefetcher.PrefetchWithStats(
+                                headCommitId,
+                                isBranch: false,
+                                hydrateFilesAfterDownload: hydrateFiles,
+                                matchedBlobCount: out matchedBlobCount,
+                                downloadedBlobCount: out downloadedBlobCount,
+                                hydratedFileCount: out hydratedFileCount);
+                            return !blobPrefetcher.HasFailures;
+                        }
+                        catch (BlobPrefetcher.FetchException e)
+                        {
+                            tracer.RelatedError(e.Message);
+                            return false;
+                        }
+                    };
+
+                if (!verbose)
+                {
+                    doPrefetch();
+                }
+                else
+                {
+                    string message =
+                        hydrateFiles
+                        ? "Fetching blobs and hydrating files "
+                        : "Fetching blobs ";
+                    this.ShowStatusWhileRunning(doPrefetch, message + this.GetCacheServerDisplay(cacheServer, enlistment.RepoUrl));
+                }
+
+                if (blobPrefetcher.HasFailures)
+                {
+                    Environment.ExitCode = 1;
+                }
+                else
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("Stats:");
+                    Console.WriteLine("  Matched blobs:    " + matchedBlobCount);
+                    Console.WriteLine("  Already cached:   " + (matchedBlobCount - downloadedBlobCount));
+                    Console.WriteLine("  Downloaded:       " + downloadedBlobCount);
+                    if (hydrateFiles)
+                    {
+                        Console.WriteLine("  Hydrated files:   " + hydratedFileCount);
+                    }
+                }
+            }
+
+            protected string GetCacheServerDisplay(CacheServerInfo cacheServer, string repoUrl)
+            {
+                if (!cacheServer.IsNone(repoUrl))
+                {
+                    return "from cache server";
+                }
+
+                return "from origin (no cache server)";
             }
 
             private void InitializeCachePathsFromRepoMetadata(

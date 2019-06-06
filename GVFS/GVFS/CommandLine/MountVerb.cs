@@ -35,8 +35,6 @@ namespace GVFS.CommandLine
         public string KeywordsCsv { get; set; }
 
         public bool SkipMountedCheck { get; set; }
-        public bool SkipVersionCheck { get; set; }
-        public CacheServerInfo ResolvedCacheServer { get; set; }
         public ServerGVFSConfig DownloadedGVFSConfig { get; set; }
 
         protected override string VerbName
