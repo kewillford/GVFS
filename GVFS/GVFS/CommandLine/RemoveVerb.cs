@@ -9,13 +9,14 @@ using System.IO;
 
 namespace GVFS.CommandLine
 {
-    [Verb(AddVerb.AddVerbName, HelpText = "Add paths to the sparse-checkout")]
-    public class AddVerb : GVFSVerb.ForExistingEnlistment
+    [Verb(RemoveVerb.RemoveVerbName, HelpText = "Remove paths from the sparse-checkout")]
+    public class RemoveVerb : GVFSVerb.ForExistingEnlistment
     {
-        private const string AddVerbName = "add";
+        private const string RemoveVerbName = "remove";
         private JsonTracer tracer;
         private GVFSEnlistment enlistment;
         private string cacheServerUrl;
+        private HashSet<string> foldersToRemove;
 
         [Option(
             "folders",
@@ -31,7 +32,7 @@ namespace GVFS.CommandLine
             HelpText = "Show all outputs on the console in addition to writing them to a log file.")]
         public bool Verbose { get; set; }
 
-        protected override string VerbName => AddVerb.AddVerbName;
+        protected override string VerbName => RemoveVerb.RemoveVerbName;
 
         protected override void Execute(GVFSEnlistment enlistment)
         {
@@ -51,17 +52,33 @@ namespace GVFS.CommandLine
                     enlistment.RepoUrl,
                     this.cacheServerUrl);
 
+                this.foldersToRemove = new HashSet<string>();
+                foreach (string folder in this.Folders.Split(';'))
+                {
+                    string lineToRemove;
+                    if (!folder.StartsWith("/"))
+                    {
+                        lineToRemove = "/" + folder;
+                    }
+                    else
+                    {
+                        lineToRemove = folder;
+                    }
+
+                    this.foldersToRemove.Add(lineToRemove);
+                }
+
                 if (!this.Verbose)
                 {
                     this.UpdateSparseCheckout();
-                    this.PrefetchBlobs();
                     this.ResetIndex();
+                    this.DeleteFromWorkingDirectory();
                 }
                 else
                 {
-                    this.ShowStatusWhileRunning(this.PrefetchBlobs, "Prefetching necessary blobs");
                     this.ShowStatusWhileRunning(this.UpdateSparseCheckout, "Updating sparse-checkout file");
-                    this.ShowStatusWhileRunning(this.ResetIndex, "Resetting index and populating the working directory");
+                    this.ShowStatusWhileRunning(this.ResetIndex, "Resetting index");
+                    this.ShowStatusWhileRunning(this.DeleteFromWorkingDirectory, "Removing paths from the working directory");
                 }
             }
             catch (Exception e)
@@ -81,45 +98,25 @@ namespace GVFS.CommandLine
 
             foreach (string line in File.ReadAllText(sparseCheckoutPath).Split('\n'))
             {
-                if (!line.StartsWith("/*") && !line.StartsWith("!/") && !string.IsNullOrEmpty(line))
+                if (!line.StartsWith("/*")
+                    && !line.StartsWith("!/")
+                    && !string.IsNullOrEmpty(line)
+                    && !this.foldersToRemove.Contains(line))
                 {
                     sparseCheckout.Add(line);
                 }
             }
 
-            foreach (string folder in this.Folders.Split(';'))
-            {
-                sparseCheckout.Add(folder);
-            }
-
-            List<string> finalLines = new List<string>();
-
-            // First line: Add everything
-            finalLines.Add("/*");
-
-            // Second line: Don't add anything inside folders
-            finalLines.Add("!/*/*");
-
-            // The rest: Add the folders we care about!
-            foreach (string folder in sparseCheckout)
-            {
-                string lineToWrite;
-                if (!folder.StartsWith("/"))
-                {
-                    lineToWrite = "/" + folder;
-                }
-                else
-                {
-                    lineToWrite = folder;
-                }
-
-                finalLines.Add(lineToWrite);
-            }
-
             using (FileStream outStream = File.OpenWrite(sparseCheckoutPath))
             using (StreamWriter writer = new StreamWriter(outStream))
             {
-                foreach (string line in finalLines)
+                // First line: Add everything
+                writer.Write("/*\n");
+
+                // Second line: Don't add anything inside folders
+                writer.Write("!/*/*\n");
+
+                foreach (string line in sparseCheckout)
                 {
                     writer.Write(line + "\n");
                 }
@@ -128,24 +125,29 @@ namespace GVFS.CommandLine
             return true;
         }
 
-        private bool PrefetchBlobs()
-        {
-            PrefetchVerb prefetchVerb = new PrefetchVerb();
-            prefetchVerb.Folders = this.Folders;
-            prefetchVerb.Files = string.Empty;
-            prefetchVerb.FoldersListFile = string.Empty;
-            prefetchVerb.FilesListFile = string.Empty;
-            prefetchVerb.Verbose = false;
-
-            prefetchVerb.ExecuteSideBySide(this.enlistment);
-
-            return true;
-        }
-
         private bool ResetIndex()
         {
             GitProcess git = new GitProcess(this.enlistment);
             git.ResetHeadToSparseCheckout();
+            return true;
+        }
+
+        private bool DeleteFromWorkingDirectory()
+        {
+            foreach (string folder in this.foldersToRemove)
+            {
+                string localPath = folder;
+
+                if (folder.StartsWith("/"))
+                {
+                    localPath = folder.Substring(1);
+                }
+
+                string path = Path.Combine(this.enlistment.WorkingDirectoryBackingRoot, localPath);
+                GVFSPlatform.Instance.FileSystem.TryGetNormalizedPath(path, out string finalPath, out string message);
+                Directory.Delete(finalPath, recursive: true);
+            }
+
             return true;
         }
     }
