@@ -2,6 +2,7 @@
 using GVFS.Common;
 using GVFS.Common.Git;
 using GVFS.Common.Http;
+using GVFS.Common.Prefetch;
 using GVFS.Common.Tracing;
 using System;
 using System.Collections.Generic;
@@ -52,16 +53,16 @@ namespace GVFS.CommandLine
                     enlistment.RepoUrl,
                     this.cacheServerUrl);
 
-                this.PrefetchBlobs();
-
                 if (!this.Verbose)
                 {
                     this.UpdateSparseCheckout();
+                    this.PrefetchBlobs();
                     this.ResetIndex();
                 }
                 else
                 {
                     this.ShowStatusWhileRunning(this.UpdateSparseCheckout, "Updating sparse-checkout file");
+                    this.PrefetchBlobs();
                     this.ShowStatusWhileRunning(this.ResetIndex, "Resetting index and populating the working directory");
                 }
             }
@@ -134,6 +135,14 @@ namespace GVFS.CommandLine
 
             string headCommitId = result.Output.Trim();
 
+            List<string> foldersList = new List<string>();
+
+            if (!BlobPrefetcher.TryLoadFolderList(this.enlistment, this.Folders, string.Empty, foldersList, false, out string error))
+            {
+                this.tracer.RelatedError($"Error while loading folder list: {error}");
+                return false;
+            }
+
             this.InitializeServerConnection(
                 this.tracer,
                 this.enlistment,
@@ -145,8 +154,8 @@ namespace GVFS.CommandLine
                 this.tracer,
                 this.enlistment,
                 headCommitId,
-                filesList: null,
-                foldersList: this.Folders.Split(';').ToList(),
+                filesList: new List<string>(),
+                foldersList: foldersList,
                 lastPrefetchArgs: null,
                 objectRequestor: objectRequestor,
                 cacheServer: cacheServer,

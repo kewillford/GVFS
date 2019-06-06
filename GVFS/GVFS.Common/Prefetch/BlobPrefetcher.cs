@@ -252,21 +252,7 @@ namespace GVFS.Common.Prefetch
 
             this.DownloadMissingCommit(commitToFetch, this.GitObjects);
 
-            // For FastFetch only, examine the shallow file to determine the previous commit that had been fetched
-            string shallowFile = Path.Combine(this.Enlistment.WorkingDirectoryBackingRoot, GVFSConstants.DotGit.Shallow);
             string previousCommit = null;
-
-            // Use the shallow file to find a recent commit to diff against to try and reduce the number of SHAs to check.
-            if (File.Exists(shallowFile))
-            {
-                previousCommit = File.ReadAllLines(shallowFile).Where(line => !string.IsNullOrWhiteSpace(line)).LastOrDefault();
-                if (string.IsNullOrWhiteSpace(previousCommit))
-                {
-                    this.Tracer.RelatedError("Shallow file exists, but contains no valid SHAs.");
-                    this.HasFailures = true;
-                    return;
-                }
-            }
 
             BlockingCollection<string> availableBlobs = new BlockingCollection<string>();
 
