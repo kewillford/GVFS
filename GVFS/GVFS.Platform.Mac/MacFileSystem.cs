@@ -12,11 +12,6 @@ namespace GVFS.Platform.Mac
             Chmod(path, mode);
         }
 
-        public override bool HydrateFile(string fileName, byte[] buffer)
-        {
-            return NativeFileReader.TryReadFirstByteOfFile(fileName, buffer);
-        }
-
         public override bool IsExecutable(string fileName)
         {
             NativeStat.StatBuffer statBuffer = this.StatFile(fileName);

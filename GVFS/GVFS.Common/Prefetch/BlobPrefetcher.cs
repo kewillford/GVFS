@@ -304,7 +304,8 @@ namespace GVFS.Common.Prefetch
             //      * availableBlobs (in param): blobs id that are available locally, from whatever source
             //  Outputs:
             //      * Hydrated files on disk.
-            HydrateFilesStage fileHydrator = new HydrateFilesStage(Environment.ProcessorCount * 2, diff.FileAddOperations, availableBlobs, this.Tracer);
+            GitRepo repo = new GitRepo(this.Tracer, this.Enlistment, new PhysicalFileSystem());
+            HydrateFilesStage fileHydrator = new HydrateFilesStage(Environment.ProcessorCount * 2, diff.FileAddOperations, availableBlobs, this.Tracer, repo);
 
             // All the stages of the pipeline are created and wired up, now kick them off in the proper sequence
 

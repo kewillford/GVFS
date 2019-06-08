@@ -57,13 +57,11 @@ namespace GVFS.CommandLine
                 {
                     this.UpdateSparseCheckout();
                     this.PrefetchBlobs();
-                    this.ResetIndex();
                 }
                 else
                 {
                     this.ShowStatusWhileRunning(this.UpdateSparseCheckout, "Updating sparse-checkout file");
                     this.PrefetchBlobs();
-                    this.ShowStatusWhileRunning(this.ResetIndex, "Resetting index and populating the working directory");
                 }
             }
             catch (Exception e)
@@ -160,7 +158,7 @@ namespace GVFS.CommandLine
                 objectRequestor: objectRequestor,
                 cacheServer: cacheServer,
                 verbose: this.Verbose,
-                hydrateFiles: false);
+                hydrateFiles: true);
 
             return true;
         }

@@ -40,9 +40,9 @@ namespace GVFS.CommandLine
 
             try
             {
-                this.tracer = new JsonTracer(GVFSConstants.GVFSEtwProviderName, "Add");
+                this.tracer = new JsonTracer(GVFSConstants.GVFSEtwProviderName, "Remove");
                 this.tracer.AddLogFileEventListener(
-                    GVFSEnlistment.GetNewGVFSLogFileName(enlistment.GVFSLogsRoot, GVFSConstants.LogFileTypes.Add),
+                    GVFSEnlistment.GetNewGVFSLogFileName(enlistment.GVFSLogsRoot, GVFSConstants.LogFileTypes.Remove),
                     EventLevel.Informational,
                     Keywords.Any);
 
@@ -71,13 +71,11 @@ namespace GVFS.CommandLine
                 if (!this.Verbose)
                 {
                     this.UpdateSparseCheckout();
-                    this.ResetIndex();
                     this.DeleteFromWorkingDirectory();
                 }
                 else
                 {
                     this.ShowStatusWhileRunning(this.UpdateSparseCheckout, "Updating sparse-checkout file");
-                    this.ShowStatusWhileRunning(this.ResetIndex, "Resetting index");
                     this.ShowStatusWhileRunning(this.DeleteFromWorkingDirectory, "Removing paths from the working directory");
                 }
             }

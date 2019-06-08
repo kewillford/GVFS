@@ -37,8 +37,6 @@ namespace GVFS.Platform.POSIX
             return POSIXFileSystem.TryGetNormalizedPathImplementation(path, out normalizedPath, out errorMessage);
         }
 
-        public abstract bool HydrateFile(string fileName, byte[] buffer);
-
         public abstract bool IsExecutable(string fileName);
 
         public abstract bool IsSocket(string fileName);
