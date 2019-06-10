@@ -5,7 +5,6 @@ using GVFS.Common.Tracing;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Threading;
 
@@ -52,10 +51,17 @@ namespace GVFS.Common.Prefetch.Pipeline
                             blobId,
                             (stream, size) =>
                             {
-                                fileSystem.CreateDirectory(Path.GetDirectoryName(modeAndPath.Path));
-                                using (FileStream outStream = File.OpenWrite(modeAndPath.Path))
+                                try
                                 {
-                                    stream.CopyToAsync(outStream).Wait();
+                                    fileSystem.CreateDirectory(Path.GetDirectoryName(modeAndPath.Path));
+                                    using (FileStream outStream = File.OpenWrite(modeAndPath.Path))
+                                    {
+                                        stream.CopyToAsync(outStream).Wait();
+                                    }
+                                }
+                                catch (Exception e)
+                                {
+                                    this.tracer.RelatedError($"Exception while copying stream: {e.Message}\n{e.StackTrace}");
                                 }
                             });
 
