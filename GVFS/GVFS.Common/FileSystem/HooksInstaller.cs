@@ -13,6 +13,7 @@ namespace GVFS.Common.FileSystem
         private static readonly HookData[] NativeHooks = new[]
         {
             new HookData(GVFSConstants.DotGit.Hooks.ReadObjectName, GVFSConstants.DotGit.Hooks.ReadObjectPath, GVFSPlatform.Instance.Constants.GVFSReadObjectHookExecutableName),
+            new HookData(GVFSConstants.DotGit.Hooks.VirtualFileSystemName, GVFSConstants.DotGit.Hooks.VirtualFileSystemPath, GVFSPlatform.Instance.Constants.GVFSVirtualFileSystemHookExecutableName),
         };
 
         static HooksInstaller()

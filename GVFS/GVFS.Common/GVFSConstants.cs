@@ -156,8 +156,10 @@ namespace GVFS.Common
             {
                 public const string LoaderExecutable = "GitHooksLoader.exe";
                 public const string ReadObjectName = "read-object";
+                public const string VirtualFileSystemName = "virtual-filesystem";
                 public static readonly string Root = Path.Combine(DotGit.Root, "hooks");
                 public static readonly string ReadObjectPath = Path.Combine(Hooks.Root, ReadObjectName);
+                public static readonly string VirtualFileSystemPath = Path.Combine(Hooks.Root, VirtualFileSystemName);
             }
 
             public static class Info

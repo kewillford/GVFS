@@ -92,33 +92,38 @@ namespace GVFS.CommandLine
                 sparseCheckout.Add(folder);
             }
 
-            List<string> finalLines = new List<string>();
-
-            // The rest: Add the folders we care about!
-            foreach (string folder in sparseCheckout)
+            string error;
+            ModifiedPathsDatabase modifiedPaths;
+            if (!ModifiedPathsDatabase.TryLoadOrCreate(
+                this.tracer,
+                Path.Combine(this.enlistment.DotGVFSRoot, GVFSConstants.DotGVFS.Databases.ModifiedPaths),
+                new Common.FileSystem.PhysicalFileSystem(),
+                out modifiedPaths,
+                out error))
             {
-                string lineToWrite;
-                if (!folder.StartsWith("/"))
-                {
-                    lineToWrite = "/" + folder;
-                }
-                else
-                {
-                    lineToWrite = folder;
-                }
-
-                finalLines.Add(lineToWrite);
+                throw new InvalidRepoException(error);
             }
 
-            using (FileStream outStream = File.OpenWrite(sparseCheckoutPath))
-            using (StreamWriter writer = new StreamWriter(outStream))
+            using (modifiedPaths)
             {
-                foreach (string line in finalLines)
+                // The rest: Add the folders we care about!
+                foreach (string folder in sparseCheckout)
                 {
-                    writer.Write(line + "\n");
+                    string lineToWrite;
+                    if (!folder.StartsWith("/"))
+                    {
+                        lineToWrite = "/" + folder;
+                    }
+                    else
+                    {
+                        lineToWrite = folder;
+                    }
+
+                    modifiedPaths.TryAdd(lineToWrite, isFolder: true, isRetryable: out bool isRetryable);
                 }
             }
 
+            this.ResetIndex();
             return true;
         }
 

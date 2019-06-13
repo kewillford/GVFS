@@ -135,6 +135,7 @@ namespace GVFS.CommandLine
                 { "core.bare", "false" },
                 { "core.logallrefupdates", "true" },
                 { GitConfigSetting.CoreVirtualizeObjectsName, "true" },
+                { GitConfigSetting.CoreVirtualFileSystemName, Paths.ConvertPathToGitFormat(GVFSConstants.DotGit.Hooks.VirtualFileSystemPath) },
                 { "core.hookspath", expectedHooksPath },
                 { GitConfigSetting.CredentialUseHttpPath, "true" },
                 { "credential.validate", "false" },
@@ -150,7 +151,6 @@ namespace GVFS.CommandLine
                 { "receive.autogc", "false" },
                 { "reset.quiet", "true" },
                 { "status.deserializePath", gitStatusCachePath },
-                { "core.sparseCheckout", "true" },
             };
 
             if (!TrySetConfig(enlistment, requiredSettings, isRequired: true))

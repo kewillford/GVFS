@@ -16,7 +16,6 @@ namespace GVFS.CommandLine
         private JsonTracer tracer;
         private GVFSEnlistment enlistment;
         private string cacheServerUrl;
-        private HashSet<string> foldersToRemove;
 
         [Option(
             "folders",
@@ -52,31 +51,47 @@ namespace GVFS.CommandLine
                     enlistment.RepoUrl,
                     this.cacheServerUrl);
 
-                this.foldersToRemove = new HashSet<string>();
-                foreach (string folder in this.Folders.Split(';'))
+                string error;
+                ModifiedPathsDatabase modifiedPaths;
+                if (!ModifiedPathsDatabase.TryLoadOrCreate(
+                    this.tracer,
+                    Path.Combine(this.enlistment.DotGVFSRoot, GVFSConstants.DotGVFS.Databases.ModifiedPaths),
+                    new Common.FileSystem.PhysicalFileSystem(),
+                    out modifiedPaths,
+                    out error))
                 {
-                    string lineToRemove;
-                    if (!folder.StartsWith("/"))
-                    {
-                        lineToRemove = "/" + folder;
-                    }
-                    else
-                    {
-                        lineToRemove = folder;
-                    }
+                    throw new InvalidRepoException(error);
+                }
 
-                    this.foldersToRemove.Add(lineToRemove);
+                using (modifiedPaths)
+                {
+                    foreach (string folder in this.Folders.Split(';'))
+                    {
+                        string lineToRemove;
+                        if (!folder.StartsWith("/"))
+                        {
+                            lineToRemove = "/" + folder;
+                        }
+                        else
+                        {
+                            lineToRemove = folder;
+                        }
+
+                        modifiedPaths.TryRemove(lineToRemove, isFolder: true, isRetryable: out bool isRetryable);
+                    }
                 }
 
                 if (!this.Verbose)
                 {
-                    this.UpdateSparseCheckout();
-                    this.DeleteFromWorkingDirectory();
+                    this.ResetIndex();
+                    ////this.UpdateSparseCheckout();
+                    ////this.DeleteFromWorkingDirectory();
                 }
                 else
                 {
-                    this.ShowStatusWhileRunning(this.UpdateSparseCheckout, "Updating sparse-checkout file");
-                    this.ShowStatusWhileRunning(this.DeleteFromWorkingDirectory, "Removing paths from the working directory");
+                    this.ShowStatusWhileRunning(this.ResetIndex, "Updating index");
+                    ////this.ShowStatusWhileRunning(this.UpdateSparseCheckout, "Updating sparse-checkout file");
+                    ////this.ShowStatusWhileRunning(this.DeleteFromWorkingDirectory, "Removing paths from the working directory");
                 }
             }
             catch (Exception e)
@@ -89,33 +104,33 @@ namespace GVFS.CommandLine
             }
         }
 
-        private bool UpdateSparseCheckout()
-        {
-            string sparseCheckoutPath = Path.Combine(this.enlistment.WorkingDirectoryBackingRoot, GVFSConstants.DotGit.Info.SparseCheckoutPath);
-            SortedSet<string> sparseCheckout = new SortedSet<string>();
+        ////private bool UpdateSparseCheckout()
+        ////{
+        ////    string sparseCheckoutPath = Path.Combine(this.enlistment.WorkingDirectoryBackingRoot, GVFSConstants.DotGit.Info.SparseCheckoutPath);
+        ////    SortedSet<string> sparseCheckout = new SortedSet<string>();
 
-            foreach (string line in File.ReadAllText(sparseCheckoutPath).Split('\n'))
-            {
-                if (!line.StartsWith("/*")
-                    && !line.StartsWith("!/")
-                    && !string.IsNullOrEmpty(line)
-                    && !this.foldersToRemove.Contains(line))
-                {
-                    sparseCheckout.Add(line);
-                }
-            }
+        ////    foreach (string line in File.ReadAllText(sparseCheckoutPath).Split('\n'))
+        ////    {
+        ////        if (!line.StartsWith("/*")
+        ////            && !line.StartsWith("!/")
+        ////            && !string.IsNullOrEmpty(line)
+        ////            && !this.foldersToRemove.Contains(line))
+        ////        {
+        ////            sparseCheckout.Add(line);
+        ////        }
+        ////    }
 
-            using (FileStream outStream = File.OpenWrite(sparseCheckoutPath))
-            using (StreamWriter writer = new StreamWriter(outStream))
-            {
-                foreach (string line in sparseCheckout)
-                {
-                    writer.Write(line + "\n");
-                }
-            }
+        ////    using (FileStream outStream = File.OpenWrite(sparseCheckoutPath))
+        ////    using (StreamWriter writer = new StreamWriter(outStream))
+        ////    {
+        ////        foreach (string line in sparseCheckout)
+        ////        {
+        ////            writer.Write(line + "\n");
+        ////        }
+        ////    }
 
-            return true;
-        }
+        ////    return true;
+        ////}
 
         private bool ResetIndex()
         {
@@ -130,23 +145,23 @@ namespace GVFS.CommandLine
             return true;
         }
 
-        private bool DeleteFromWorkingDirectory()
-        {
-            foreach (string folder in this.foldersToRemove)
-            {
-                string localPath = folder;
+        ////private bool DeleteFromWorkingDirectory()
+        ////{
+        ////    foreach (string folder in this.foldersToRemove)
+        ////    {
+        ////        string localPath = folder;
 
-                if (folder.StartsWith("/"))
-                {
-                    localPath = folder.Substring(1);
-                }
+        ////        if (folder.StartsWith("/"))
+        ////        {
+        ////            localPath = folder.Substring(1);
+        ////        }
 
-                string path = Path.Combine(this.enlistment.WorkingDirectoryBackingRoot, localPath);
-                GVFSPlatform.Instance.FileSystem.TryGetNormalizedPath(path, out string finalPath, out string message);
-                Directory.Delete(finalPath, recursive: true);
-            }
+        ////        string path = Path.Combine(this.enlistment.WorkingDirectoryBackingRoot, localPath);
+        ////        GVFSPlatform.Instance.FileSystem.TryGetNormalizedPath(path, out string finalPath, out string message);
+        ////        Directory.Delete(finalPath, recursive: true);
+        ////    }
 
-            return true;
-        }
+        ////    return true;
+        ////}
     }
 }

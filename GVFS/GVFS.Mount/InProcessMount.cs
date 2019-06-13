@@ -16,6 +16,7 @@ namespace GVFS.Mount
 {
     public class InProcessMount
     {
+        private const string ModifiedPathsVersion = "1";
         private readonly bool showDebugWindow;
 
         private GVFSEnlistment enlistment;
@@ -234,7 +235,8 @@ namespace GVFS.Mount
                     break;
 
                 case NamedPipeMessages.ModifiedPaths.ListRequest:
-                    throw new NotSupportedException(message.Header);
+                    this.HandleModifiedPathsListRequest(message, connection);
+                    break;
 
                 case NamedPipeMessages.PostIndexChanged.NotificationRequest:
                     throw new NotSupportedException(message.Header);
@@ -252,6 +254,49 @@ namespace GVFS.Mount
                     connection.TrySendResponse(NamedPipeMessages.UnknownRequest);
                     break;
             }
+        }
+
+        private void HandleModifiedPathsListRequest(NamedPipeMessages.Message message, NamedPipeServer.Connection connection)
+        {
+            NamedPipeMessages.ModifiedPaths.Response response;
+            NamedPipeMessages.ModifiedPaths.Request request = new NamedPipeMessages.ModifiedPaths.Request(message);
+            if (request == null)
+            {
+                response = new NamedPipeMessages.ModifiedPaths.Response(NamedPipeMessages.UnknownRequest);
+            }
+            else if (this.currentState != MountState.Ready)
+            {
+                response = new NamedPipeMessages.ModifiedPaths.Response(NamedPipeMessages.MountNotReadyResult);
+            }
+            else
+            {
+                if (request.Version != ModifiedPathsVersion)
+                {
+                    response = new NamedPipeMessages.ModifiedPaths.Response(NamedPipeMessages.ModifiedPaths.InvalidVersion);
+                }
+                else
+                {
+                    string error;
+                    ModifiedPathsDatabase modifiedPaths;
+                    if (!ModifiedPathsDatabase.TryLoadOrCreate(
+                        this.context.Tracer,
+                        Path.Combine(this.context.Enlistment.DotGVFSRoot, GVFSConstants.DotGVFS.Databases.ModifiedPaths),
+                        this.context.FileSystem,
+                        out modifiedPaths,
+                        out error))
+                    {
+                        throw new InvalidRepoException(error);
+                    }
+
+                    using (modifiedPaths)
+                    {
+                        string data = string.Join("\0", modifiedPaths.GetAllModifiedPaths()) + "\0";
+                        response = new NamedPipeMessages.ModifiedPaths.Response(NamedPipeMessages.ModifiedPaths.SuccessResult, data);
+                    }
+                }
+            }
+
+            connection.TrySendResponse(response.CreateMessage()); connection.TrySendResponse(response.CreateMessage());
         }
 
         private void HandleLockRequest(string messageBody, NamedPipeServer.Connection connection)
