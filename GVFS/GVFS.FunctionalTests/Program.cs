@@ -43,7 +43,7 @@ namespace GVFS.FunctionalTests
             {
                 Console.WriteLine("Running the full suite of tests");
 
-                GVFSTestConfig.GitRepoTestsValidateWorkTree = DataSources.AllBools;
+                GVFSTestConfig.GitRepoTestsValidateWorkTree = DataSources.IntegerModes(3);
 
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
@@ -56,10 +56,18 @@ namespace GVFS.FunctionalTests
             }
             else
             {
+                int validateMode = 1;
+
+                if (runner.HasCustomArg("--partial-mode"))
+                {
+                    validateMode = 2;
+                    includeCategories.Add(Categories.GitCommands);
+                }
+
                 GVFSTestConfig.GitRepoTestsValidateWorkTree =
                     new object[]
                     {
-                        new object[] { true }
+                        new object[] { validateMode },
                     };
 
                 if (runner.HasCustomArg("--extra-only"))
