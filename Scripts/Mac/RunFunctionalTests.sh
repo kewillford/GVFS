@@ -13,4 +13,8 @@ if [ "$2" != "--test-gvfs-on-path" ]; then
   $VFS_SRCDIR/ProjFS.Mac/Scripts/LoadPrjFSKext.sh $CONFIGURATION
 fi
 
-$VFS_PUBLISHDIR/GVFS.FunctionalTests --full-suite $2
+if [ "$3" != "--sparse-mode" ]; then
+  $VFS_PUBLISHDIR/GVFS.FunctionalTests --full-suite $2
+else
+  $VFS_PUBLISHDIR/GVFS.FunctionalTests $2 $3
+fi
