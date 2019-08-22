@@ -455,6 +455,13 @@ namespace GVFS.Platform.Windows
             }
         }
 
+        public bool RemoveRootAttributes(string fullPath, out string error)
+        {
+            // No attributes need to be removed on Windows
+            error = string.Empty;
+            return true;
+        }
+
         // TODO 1050199: Once the service is an optional component, GVFS should only attempt to attach
         // the filter via the service if the service is present\enabled
         public bool IsReady(JsonTracer tracer, string enlistmentRoot, TextWriter output, out string error)

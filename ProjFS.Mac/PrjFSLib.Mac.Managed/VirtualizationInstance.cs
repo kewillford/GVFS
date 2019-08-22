@@ -29,6 +29,11 @@ namespace PrjFSLib.Mac
             return Interop.PrjFSLib.ConvertDirectoryToVirtualizationRoot(fullPath);
         }
 
+        public static Result RemoveRootAttributes(string fullPath)
+        {
+            return Interop.PrjFSLib.RemoveRootAttributes(fullPath);
+        }
+
         public virtual Result StartVirtualizationInstance(
             string virtualizationRootFullPath,
             uint poolThreadCount)

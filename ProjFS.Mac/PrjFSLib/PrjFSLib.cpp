@@ -348,6 +348,27 @@ PrjFS_Result PrjFS_ConvertDirectoryToVirtualizationRoot(
     return RecursivelyMarkAllChildrenAsInRoot(virtualizationRootFullPath);
 }
 
+PrjFS_Result PrjFS_RemoveRootAttributes(
+    _In_    const char*                             fullPath)
+{
+#ifdef DEBUG
+    cout
+        << "PrjFS_RemoveRootAttributes("
+        << fullPath
+        << ")" << endl;
+#endif
+
+    errno_t result = RemoveXAttrWithoutFollowingLinks(fullPath, PrjFSFileXAttrName);
+    if (0 != result && ENOATTR != result)
+    {
+        // It's expected that RemoveXAttrWithoutFollowingLinks return ENOATTR if
+        // another thread has removed the attribute
+        LogError("PrjFS_RemoveRootAttributes failed for '%s', error=%d strerror=%s", fullPath, result, strerror(errno));
+    }
+
+    return result;
+}
+
 PrjFS_Result PrjFS_WritePlaceholderDirectory(
     _In_    const char*                             relativePath)
 {

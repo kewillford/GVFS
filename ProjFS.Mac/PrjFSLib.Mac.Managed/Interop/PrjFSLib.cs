@@ -71,5 +71,9 @@ namespace PrjFSLib.Mac.Interop
 
         [DllImport(PrjFSLibPath, EntryPoint = "PrjFS_UnregisterForOfflineIO")]
         public static extern Result UnregisterForOfflineIO();
+
+        [DllImport(PrjFSLibPath, EntryPoint = "PrjFS_RemoveRootAttributes")]
+        public static extern Result RemoveRootAttributes(
+            string fullPath);
     }
 }

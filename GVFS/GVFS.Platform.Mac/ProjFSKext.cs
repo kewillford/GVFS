@@ -88,6 +88,19 @@ namespace GVFS.Platform.Mac
             return true;
         }
 
+        public bool RemoveRootAttributes(string fullPath, out string error)
+        {
+            error = string.Empty;
+            Result result = VirtualizationInstance.RemoveRootAttributes(fullPath);
+            if (result != Result.Success)
+            {
+                error = "Failed to remove root attributes on \"" + fullPath + "\", error: " + result.ToString("F");
+                return false;
+            }
+
+            return true;
+        }
+
         public bool RegisterForOfflineIO()
         {
             return PrjFSLib.Mac.Managed.OfflineIO.RegisterForOfflineIO();

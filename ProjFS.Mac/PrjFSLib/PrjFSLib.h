@@ -75,6 +75,9 @@ PrjFS_Result PrjFS_StopVirtualizationInstance();
 extern "C" PrjFS_Result PrjFS_ConvertDirectoryToVirtualizationRoot(
     _In_    const char*                             virtualizationRootFullPath);
 
+extern "C" PrjFS_Result PrjFS_RemoveRootAttributes(
+    _In_    const char*                             fullPath);
+
 PrjFS_Result PrjFS_ConvertDirectoryToPlaceholder(
     _In_    const char*                             relativePath);
 
